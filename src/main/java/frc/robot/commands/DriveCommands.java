@@ -16,24 +16,16 @@ package frc.robot.commands;
 import static frc.robot.subsystems.drive.DriveConstants.maxSpeedMetersPerSec;
 
 import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.path.GoalEndState;
 import com.pathplanner.lib.path.PathConstraints;
-import com.pathplanner.lib.pathfinding.Pathfinder;
-import com.pathplanner.lib.pathfinding.Pathfinding;
-
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.trajectory.constraint.RectangularRegionConstraint;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.drive.Drive;
-import frc.robot.subsystems.drive.DriveConstants;
-
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
@@ -120,8 +112,20 @@ public class DriveCommands {
   public static Command PathfindtoBranch(Drive drive) {
     return Commands.run(
         () -> {
-          // Implement Pathfinding logic here
-          System.out.println("Pathfinding logic executed.");
+          Pose2d targetPose = new Pose2d(-10, -5, Rotation2d.fromDegrees(180));
+
+          // Create the constraints to use while pathfinding
+          PathConstraints constraints =
+              new PathConstraints(
+                  3.0, 4.0, Units.degreesToRadians(540), Units.degreesToRadians(720));
+
+          // Since AutoBuilder is configured, we can use it to build pathfinding commands
+          Command pathfindingCommand =
+              AutoBuilder.pathfindToPose(
+                  targetPose, constraints, 0.0 // Goal end velocity in meters/sec
+                  );
+
+          pathfindingCommand.schedule();
         },
         drive);
   }
