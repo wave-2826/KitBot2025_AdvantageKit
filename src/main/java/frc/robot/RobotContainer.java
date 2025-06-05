@@ -145,6 +145,8 @@ public class RobotContainer {
                     drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.k180deg));
                   }
                 }));
+
+    controller.b().onTrue(DriveCommands.PathfindtoBranch(drive));
   }
 
   /**

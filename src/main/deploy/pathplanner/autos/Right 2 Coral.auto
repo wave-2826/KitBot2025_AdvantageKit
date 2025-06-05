@@ -7,7 +7,7 @@
         {
           "type": "path",
           "data": {
-            "pathName": "Right 2 Coral"
+            "pathName": "Right 2 Coral Start"
           }
         },
         {
@@ -43,7 +43,7 @@
       ]
     }
   },
-  "resetOdom": false,
+  "resetOdom": true,
   "folder": null,
   "choreoAuto": false
 }
