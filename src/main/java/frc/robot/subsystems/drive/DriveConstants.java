@@ -34,7 +34,7 @@ public class DriveConstants {
   public static final double wheelRadiusMeters = Units.inchesToMeters(3.0);
   public static final double motorReduction = 10.71;
   public static final boolean leftInverted = false;
-  public static final boolean rightInverted = false;
+  public static final boolean rightInverted = true;
   public static final DCMotor gearbox = DCMotor.getCIM(2);
 
   // Velocity PID configuration

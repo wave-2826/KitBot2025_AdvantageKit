@@ -22,6 +22,15 @@ import edu.wpi.first.wpilibj.RobotBase;
  */
 public final class Constants {
   public static final Mode simMode = Mode.SIM;
+
+  /** If the robot should log data in simulation. */
+  public static final boolean logInSimulation = false;
+  /**
+   * Whether to use NetworkTables instead of RLog for AdvantageScope logging. RLog _significantly_
+   * reduces lag in AdvantageScope.
+   */
+  public static final boolean useNTLogs = false;
+
   public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : simMode;
 
   public static enum Mode {
