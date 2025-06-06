@@ -120,13 +120,7 @@ public class Drive extends SubsystemBase {
         // Update odometry
         poseEstimator.update(rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters());
 
-        if (DriverStation.getAlliance().orElse(DriverStation.Alliance.Blue) == DriverStation.Alliance.Red) {
-            DriverStationInterface.getInstance()
-                    .update(new Pose2d(getPose().getX(), getPose().getY(), getPose().getRotation()));
-        } else {
-            DriverStationInterface.getInstance()
-                    .update(new Pose2d(getPose().getX(), getPose().getY(), getPose().getRotation()));
-        }
+        DriverStationInterface.getInstance().update(getPose());
     }
 
     /** Runs the drive at the desired velocity. */
