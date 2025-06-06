@@ -7,30 +7,16 @@
     "**/.hg": true,
     "**/CVS": true,
     "**/.DS_Store": true,
+    "build/": true,
     "bin/": true,
+    "gradle/": true,
+    ".gradle/": true,
     "**/.classpath": true,
     "**/.project": true,
-    "**/.settings": true,
     "**/.factorypath": true,
     "**/*~": true
   },
-  "java.test.config": [
-    {
-      "name": "WPIlibUnitTests",
-      "workingDirectory": "${workspaceFolder}/build/jni/release",
-      "vmargs": [
-        "-Djava.library.path=${workspaceFolder}/build/jni/release"
-      ],
-      "env": {
-        "LD_LIBRARY_PATH": "${workspaceFolder}/build/jni/release",
-        "DYLD_LIBRARY_PATH": "${workspaceFolder}/build/jni/release"
-      }
-    },
-    null
-  ],
-  "java.test.defaultConfig": "WPIlibUnitTests",
-  "spotlessGradle.format.enable": true,
-  "spotlessGradle.diagnostics.enable": false,
+  "java.import.gradle.wrapper.enabled": true,
   "java.import.gradle.annotationProcessing.enabled": false,
   "java.completion.favoriteStaticMembers": [
     "org.junit.Assert.*",
@@ -62,11 +48,15 @@
     "edu.wpi.first.math.**.proto.*",
     "edu.wpi.first.math.**.struct.*"
   ],
-  "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle",
-  "[json]": {
-    "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle"
-  },
-  "[java]": {
-    "editor.defaultFormatter": "richardwillis.vscode-spotless-gradle"
-  }
+  "editor.detectIndentation": false,
+  "editor.tabSize": 4,
+  "files.autoSave": "onFocusChange",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": null,
+  "wpilib.selectDefaultSimulateExtension": false,
+  "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx64G -Xms100m -Xlog:disable",
+  "java.debug.settings.hotCodeReplace": "auto",
+  "wpilib.autoStartRioLog": false,
+  "wpilib.skipSelectSimulateExtension": true,
+  "wpilib.skipTests": true
 }

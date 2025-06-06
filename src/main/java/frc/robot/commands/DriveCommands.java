@@ -18,6 +18,7 @@ import static frc.robot.subsystems.drive.DriveConstants.maxSpeedMetersPerSec;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
@@ -26,6 +27,9 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.drive.Drive;
+import frc.robot.subsystems.drive.PathFindConstants;
+import frc.robot.util.DriverStationInterface;
+import frc.robot.util.ReefTarget;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
@@ -112,7 +116,7 @@ public class DriveCommands {
   public static Command PathfindtoBranch(Drive drive) {
     return Commands.run(
         () -> {
-          Pose2d targetPose = new Pose2d(-10, -5, Rotation2d.fromDegrees(180));
+          Pose2d targetPose = getBranchPose(DriverStationInterface.getInstance().getReefTarget());
 
           // Create the constraints to use while pathfinding
           PathConstraints constraints =
@@ -124,9 +128,75 @@ public class DriveCommands {
               AutoBuilder.pathfindToPose(
                   targetPose, constraints, 0.0 // Goal end velocity in meters/sec
                   );
+          if (targetPose == new Pose2d(0, 0, Rotation2d.fromDegrees(0))) {
+            System.out.println("Invalid target pose for pathfinding to branch.");
+          }
 
-          pathfindingCommand.schedule();
+          Command RotationCommand =
+              Commands.run(
+                      () -> {
+                        PIDController rotationController =
+                            new PIDController(
+                                PathFindConstants.kP, PathFindConstants.kI, PathFindConstants.kD);
+                        rotationController.enableContinuousInput(-180.0, 180.0);
+                        double targetAngle = targetPose.getRotation().getDegrees();
+                        double currentAngle = drive.getRotation().getDegrees();
+                        double rotationOutput =
+                            rotationController.calculate(currentAngle, targetAngle);
+                        rotationOutput = MathUtil.clamp(rotationOutput, -1.0, 1.0); // Clamp output
+
+                        // turn the robot to face the target pose in the nearest direction
+                        rotationOutput = MathUtil.applyDeadband(rotationOutput, DEADBAND);
+                        rotationOutput = MathUtil.clamp(rotationOutput, -1.0, 1.0);
+                        // Run the drive with the calculated rotation output
+
+                        double leftOutput = -rotationOutput * PathFindConstants.maxRotationSpeed;
+                        double rightOutput = rotationOutput * PathFindConstants.maxRotationSpeed;
+
+                        drive.runOpenLoop(leftOutput, rightOutput);
+                        rotationController.close();
+                      })
+                  .until(
+                      () ->
+                          Math.abs(
+                                  drive.getRotation().getDegrees()
+                                      - targetPose.getRotation().getDegrees())
+                              < 5.0);
+
+          Commands.sequence(pathfindingCommand, RotationCommand)
+              .schedule(); // Schedule the pathfinding command followed by the rotation command
         },
         drive);
+  }
+
+  private static Pose2d getBranchPose(ReefTarget reefTarget) {
+    switch (reefTarget.branch()) {
+      case A:
+        return PathFindConstants.A;
+      case B:
+        return PathFindConstants.B;
+      case C:
+        return PathFindConstants.C;
+      case D:
+        return PathFindConstants.D;
+      case E:
+        return PathFindConstants.E;
+      case F:
+        return PathFindConstants.F;
+      case G:
+        return PathFindConstants.G;
+      case H:
+        return PathFindConstants.H;
+      case I:
+        return PathFindConstants.I;
+      case J:
+        return PathFindConstants.J;
+      case K:
+        return PathFindConstants.K;
+      case L:
+        return PathFindConstants.L;
+      default:
+        return new Pose2d(0, 0, Rotation2d.fromDegrees(0));
+    }
   }
 }

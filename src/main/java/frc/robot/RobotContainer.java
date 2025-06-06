@@ -41,6 +41,7 @@ import frc.robot.subsystems.roller.RollerIOTalonSRX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
+import frc.robot.util.DriverStationInterface;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
@@ -94,6 +95,8 @@ public class RobotContainer {
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         break;
     }
+
+    DriverStationInterface.getInstance();
 
     // Set up auto routines
     NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(3.0));
