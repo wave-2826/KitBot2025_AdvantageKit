@@ -4,7 +4,6 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 
 public class PathFindConstants {
-  private static final double FIELD_WIDTH = 17.543; // Meters
 
   // Blue Reef Positions
   public static final Pose2d A = new Pose2d(3.19, 4.28, Rotation2d.fromDegrees(0));
@@ -25,16 +24,5 @@ public class PathFindConstants {
   public static final double kI = 0.0; // Integral gain
   public static final double kD = 0.0; // Derivative gain
   public static final double maxRotationSpeed = 3.0; // Maximum rotation speed in m/s
-
-  /**
-   * Flips a Pose2d across the center X-axis of the field. Used to convert Blue Alliance poses to
-   * Red Alliance poses.
-   *
-   * @param bluePose The Pose2d on the blue alliance side.
-   * @return The corresponding Pose2d on the red alliance side.
-   */
-  private static Pose2d flipXPose(Pose2d bluePose) {
-    return new Pose2d(
-        FIELD_WIDTH - bluePose.getX(), bluePose.getY(), bluePose.getRotation().times(-1));
   }
 }
