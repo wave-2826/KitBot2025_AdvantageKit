@@ -5,7 +5,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 
 public class PathFindConstants {
 
-  // Blue Reef Positions
+  // Reef Positions
   public static final Pose2d A = new Pose2d(3.19, 4.28, Rotation2d.fromDegrees(0));
   public static final Pose2d B = new Pose2d(3.19, 3.77, Rotation2d.fromDegrees(0));
   public static final Pose2d C = new Pose2d(3.66, 3.01, Rotation2d.fromDegrees(60));
