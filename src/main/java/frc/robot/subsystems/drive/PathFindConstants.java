@@ -24,5 +24,4 @@ public class PathFindConstants {
   public static final double kI = 0.0; // Integral gain
   public static final double kD = 0.0; // Derivative gain
   public static final double maxRotationSpeed = 3.0; // Maximum rotation speed in m/s
-  }
 }
