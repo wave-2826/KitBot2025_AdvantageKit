@@ -43,185 +43,189 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Drive extends SubsystemBase {
-    private final DriveIO io;
-    private final DriveIOInputsAutoLogged inputs = new DriveIOInputsAutoLogged();
-    private final GyroIO gyroIO;
-    private final GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
+  private final DriveIO io;
+  private final DriveIOInputsAutoLogged inputs = new DriveIOInputsAutoLogged();
+  private final GyroIO gyroIO;
+  private final GyroIOInputsAutoLogged gyroInputs = new GyroIOInputsAutoLogged();
 
-    private final DifferentialDriveKinematics kinematics = new DifferentialDriveKinematics(trackWidth);
-    private final double kS = Constants.currentMode == Mode.SIM ? simKs : realKs;
-    private final double kV = Constants.currentMode == Mode.SIM ? simKv : realKv;
-    private final DifferentialDrivePoseEstimator poseEstimator = new DifferentialDrivePoseEstimator(kinematics,
-            new Rotation2d(), 0.0, 0.0, new Pose2d());
-    private final SysIdRoutine sysId;
-    private Rotation2d rawGyroRotation = new Rotation2d();
-    private double lastLeftPositionMeters = 0.0;
-    private double lastRightPositionMeters = 0.0;
+  private final DifferentialDriveKinematics kinematics =
+      new DifferentialDriveKinematics(trackWidth);
+  private final double kS = Constants.currentMode == Mode.SIM ? simKs : realKs;
+  private final double kV = Constants.currentMode == Mode.SIM ? simKv : realKv;
+  private final DifferentialDrivePoseEstimator poseEstimator =
+      new DifferentialDrivePoseEstimator(kinematics, new Rotation2d(), 0.0, 0.0, new Pose2d());
+  private final SysIdRoutine sysId;
+  private Rotation2d rawGyroRotation = new Rotation2d();
+  private double lastLeftPositionMeters = 0.0;
+  private double lastRightPositionMeters = 0.0;
 
-    public Drive(DriveIO io, GyroIO gyroIO) {
-        this.io = io;
-        this.gyroIO = gyroIO;
+  public Drive(DriveIO io, GyroIO gyroIO) {
+    this.io = io;
+    this.gyroIO = gyroIO;
 
-        // Configure AutoBuilder for PathPlanner
-        AutoBuilder.configure(
-                this::getPose,
-                this::setPose,
-                () -> kinematics.toChassisSpeeds(
-                        new DifferentialDriveWheelSpeeds(
-                                getLeftVelocityMetersPerSec(), getRightVelocityMetersPerSec())),
-                (ChassisSpeeds speeds) -> runClosedLoop(speeds),
-                new PPLTVController(0.02, maxSpeedMetersPerSec),
-                ppConfig,
-                () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
-                this);
-        Pathfinding.setPathfinder(new LocalADStarAK());
-        PathPlannerLogging.setLogActivePathCallback(
-                (activePath) -> {
-                    Logger.recordOutput(
-                            "Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
-                });
-        PathPlannerLogging.setLogTargetPoseCallback(
-                (targetPose) -> {
-                    Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
-                });
+    // Configure AutoBuilder for PathPlanner
+    AutoBuilder.configure(
+        this::getPose,
+        this::setPose,
+        () ->
+            kinematics.toChassisSpeeds(
+                new DifferentialDriveWheelSpeeds(
+                    getLeftVelocityMetersPerSec(), getRightVelocityMetersPerSec())),
+        (ChassisSpeeds speeds) -> runClosedLoop(speeds),
+        new PPLTVController(0.02, maxSpeedMetersPerSec),
+        ppConfig,
+        () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
+        this);
+    Pathfinding.setPathfinder(new LocalADStarAK());
+    PathPlannerLogging.setLogActivePathCallback(
+        (activePath) -> {
+          Logger.recordOutput(
+              "Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
+        });
+    PathPlannerLogging.setLogTargetPoseCallback(
+        (targetPose) -> {
+          Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
+        });
 
-        // Configure SysId
-        sysId = new SysIdRoutine(
-                new SysIdRoutine.Config(
-                        null,
-                        null,
-                        null,
-                        (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
-                new SysIdRoutine.Mechanism(
-                        (voltage) -> runOpenLoop(voltage.in(Volts), voltage.in(Volts)), null, this));
+    // Configure SysId
+    sysId =
+        new SysIdRoutine(
+            new SysIdRoutine.Config(
+                null,
+                null,
+                null,
+                (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
+            new SysIdRoutine.Mechanism(
+                (voltage) -> runOpenLoop(voltage.in(Volts), voltage.in(Volts)), null, this));
+  }
+
+  @Override
+  public void periodic() {
+    io.updateInputs(inputs);
+    gyroIO.updateInputs(gyroInputs);
+    Logger.processInputs("Drive", inputs);
+    Logger.processInputs("Drive/Gyro", inputs);
+
+    // Update gyro angle
+    if (gyroInputs.connected) {
+      // Use the real gyro angle
+      rawGyroRotation = gyroInputs.yawPosition;
+    } else {
+      // Use the angle delta from the kinematics and module deltas
+      Twist2d twist =
+          kinematics.toTwist2d(
+              getLeftPositionMeters() - lastLeftPositionMeters,
+              getRightPositionMeters() - lastRightPositionMeters);
+      rawGyroRotation = rawGyroRotation.plus(new Rotation2d(twist.dtheta));
+      lastLeftPositionMeters = getLeftPositionMeters();
+      lastRightPositionMeters = getRightPositionMeters();
     }
 
-    @Override
-    public void periodic() {
-        io.updateInputs(inputs);
-        gyroIO.updateInputs(gyroInputs);
-        Logger.processInputs("Drive", inputs);
-        Logger.processInputs("Drive/Gyro", inputs);
+    // Update odometry
+    poseEstimator.update(rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters());
 
-        // Update gyro angle
-        if (gyroInputs.connected) {
-            // Use the real gyro angle
-            rawGyroRotation = gyroInputs.yawPosition;
-        } else {
-            // Use the angle delta from the kinematics and module deltas
-            Twist2d twist = kinematics.toTwist2d(
-                    getLeftPositionMeters() - lastLeftPositionMeters,
-                    getRightPositionMeters() - lastRightPositionMeters);
-            rawGyroRotation = rawGyroRotation.plus(new Rotation2d(twist.dtheta));
-            lastLeftPositionMeters = getLeftPositionMeters();
-            lastRightPositionMeters = getRightPositionMeters();
-        }
+    DriverStationInterface.getInstance().update(getPose());
+  }
 
-        // Update odometry
-        poseEstimator.update(rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters());
+  /** Runs the drive at the desired velocity. */
+  public void runClosedLoop(ChassisSpeeds speeds) {
+    var wheelSpeeds = kinematics.toWheelSpeeds(speeds);
+    runClosedLoop(wheelSpeeds.leftMetersPerSecond, wheelSpeeds.rightMetersPerSecond);
+  }
 
-        DriverStationInterface.getInstance().update(getPose());
-    }
+  /** Runs the drive at the desired left and right velocities. */
+  public void runClosedLoop(double leftMetersPerSec, double rightMetersPerSec) {
+    double leftRadPerSec = leftMetersPerSec / wheelRadiusMeters;
+    double rightRadPerSec = rightMetersPerSec / wheelRadiusMeters;
+    Logger.recordOutput("Drive/LeftSetpointRadPerSec", leftRadPerSec);
+    Logger.recordOutput("Drive/RightSetpointRadPerSec", rightRadPerSec);
 
-    /** Runs the drive at the desired velocity. */
-    public void runClosedLoop(ChassisSpeeds speeds) {
-        var wheelSpeeds = kinematics.toWheelSpeeds(speeds);
-        runClosedLoop(wheelSpeeds.leftMetersPerSecond, wheelSpeeds.rightMetersPerSecond);
-    }
+    double leftFFVolts = kS * Math.signum(leftRadPerSec) + kV * leftRadPerSec;
+    double rightFFVolts = kS * Math.signum(rightRadPerSec) + kV * rightRadPerSec;
+    io.setVelocity(leftRadPerSec, rightRadPerSec, leftFFVolts, rightFFVolts);
+  }
 
-    /** Runs the drive at the desired left and right velocities. */
-    public void runClosedLoop(double leftMetersPerSec, double rightMetersPerSec) {
-        double leftRadPerSec = leftMetersPerSec / wheelRadiusMeters;
-        double rightRadPerSec = rightMetersPerSec / wheelRadiusMeters;
-        Logger.recordOutput("Drive/LeftSetpointRadPerSec", leftRadPerSec);
-        Logger.recordOutput("Drive/RightSetpointRadPerSec", rightRadPerSec);
+  /** Runs the drive in open loop. */
+  public void runOpenLoop(double leftVolts, double rightVolts) {
+    io.setVoltage(leftVolts, rightVolts);
+  }
 
-        double leftFFVolts = kS * Math.signum(leftRadPerSec) + kV * leftRadPerSec;
-        double rightFFVolts = kS * Math.signum(rightRadPerSec) + kV * rightRadPerSec;
-        io.setVelocity(leftRadPerSec, rightRadPerSec, leftFFVolts, rightFFVolts);
-    }
+  /** Stops the drive. */
+  public void stop() {
+    runOpenLoop(0.0, 0.0);
+  }
 
-    /** Runs the drive in open loop. */
-    public void runOpenLoop(double leftVolts, double rightVolts) {
-        io.setVoltage(leftVolts, rightVolts);
-    }
+  /** Returns a command to run a quasistatic test in the specified direction. */
+  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+    return sysId.quasistatic(direction);
+  }
 
-    /** Stops the drive. */
-    public void stop() {
-        runOpenLoop(0.0, 0.0);
-    }
+  /** Returns a command to run a dynamic test in the specified direction. */
+  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+    return sysId.dynamic(direction);
+  }
 
-    /** Returns a command to run a quasistatic test in the specified direction. */
-    public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
-        return sysId.quasistatic(direction);
-    }
+  /** Returns the current odometry pose. */
+  @AutoLogOutput(key = "Odometry/Robot")
+  public Pose2d getPose() {
+    return poseEstimator.getEstimatedPosition();
+  }
 
-    /** Returns a command to run a dynamic test in the specified direction. */
-    public Command sysIdDynamic(SysIdRoutine.Direction direction) {
-        return sysId.dynamic(direction);
-    }
+  /** Returns the current odometry rotation. */
+  public Rotation2d getRotation() {
+    return getPose().getRotation();
+  }
 
-    /** Returns the current odometry pose. */
-    @AutoLogOutput(key = "Odometry/Robot")
-    public Pose2d getPose() {
-        return poseEstimator.getEstimatedPosition();
-    }
+  /** Resets the current odometry pose. */
+  public void setPose(Pose2d pose) {
+    poseEstimator.resetPosition(
+        rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters(), pose);
+  }
 
-    /** Returns the current odometry rotation. */
-    public Rotation2d getRotation() {
-        return getPose().getRotation();
-    }
+  /**
+   * Adds a vision measurement to the pose estimator.
+   *
+   * @param visionPose The pose of the robot as measured by the vision camera.
+   * @param timestamp The timestamp of the vision measurement in seconds.
+   */
+  public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
+    poseEstimator.addVisionMeasurement(visionPose, timestamp);
+  }
 
-    /** Resets the current odometry pose. */
-    public void setPose(Pose2d pose) {
-        poseEstimator.resetPosition(
-                rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters(), pose);
-    }
+  /** Returns the position of the left wheels in meters. */
+  @AutoLogOutput
+  public double getLeftPositionMeters() {
+    return inputs.leftPositionRad * wheelRadiusMeters;
+  }
 
-    /**
-     * Adds a vision measurement to the pose estimator.
-     *
-     * @param visionPose The pose of the robot as measured by the vision camera.
-     * @param timestamp  The timestamp of the vision measurement in seconds.
-     */
-    public void addVisionMeasurement(Pose2d visionPose, double timestamp) {
-        poseEstimator.addVisionMeasurement(visionPose, timestamp);
-    }
+  /** Returns the position of the right wheels in meters. */
+  @AutoLogOutput
+  public double getRightPositionMeters() {
+    return inputs.rightPositionRad * wheelRadiusMeters;
+  }
 
-    /** Returns the position of the left wheels in meters. */
-    @AutoLogOutput
-    public double getLeftPositionMeters() {
-        return inputs.leftPositionRad * wheelRadiusMeters;
-    }
+  /** Returns the velocity of the left wheels in meters/second. */
+  @AutoLogOutput
+  public double getLeftVelocityMetersPerSec() {
+    return inputs.leftVelocityRadPerSec * wheelRadiusMeters;
+  }
 
-    /** Returns the position of the right wheels in meters. */
-    @AutoLogOutput
-    public double getRightPositionMeters() {
-        return inputs.rightPositionRad * wheelRadiusMeters;
-    }
+  /** Returns the velocity of the right wheels in meters/second. */
+  @AutoLogOutput
+  public double getRightVelocityMetersPerSec() {
+    return inputs.rightVelocityRadPerSec * wheelRadiusMeters;
+  }
 
-    /** Returns the velocity of the left wheels in meters/second. */
-    @AutoLogOutput
-    public double getLeftVelocityMetersPerSec() {
-        return inputs.leftVelocityRadPerSec * wheelRadiusMeters;
-    }
+  /** Returns the average velocity in radians/second. */
+  public double getCharacterizationVelocity() {
+    return (inputs.leftVelocityRadPerSec + inputs.rightVelocityRadPerSec) / 2.0;
+  }
 
-    /** Returns the velocity of the right wheels in meters/second. */
-    @AutoLogOutput
-    public double getRightVelocityMetersPerSec() {
-        return inputs.rightVelocityRadPerSec * wheelRadiusMeters;
-    }
-
-    /** Returns the average velocity in radians/second. */
-    public double getCharacterizationVelocity() {
-        return (inputs.leftVelocityRadPerSec + inputs.rightVelocityRadPerSec) / 2.0;
-    }
-
-    public void addVisionMeasurement(
-            Pose2d visionRobotPoseMeters,
-            double timestampSeconds,
-            Matrix<N3, N1> visionMeasurementStdDevs) {
-        poseEstimator.addVisionMeasurement(
-                visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
-    }
+  public void addVisionMeasurement(
+      Pose2d visionRobotPoseMeters,
+      double timestampSeconds,
+      Matrix<N3, N1> visionMeasurementStdDevs) {
+    poseEstimator.addVisionMeasurement(
+        visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
+  }
 }
