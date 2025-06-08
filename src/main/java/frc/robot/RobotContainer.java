@@ -25,7 +25,6 @@ import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.ProxyCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
@@ -43,194 +42,187 @@ import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.util.DriverStationInterface;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
- * This class is where the bulk of the robot should be declared. Since
- * Command-based is a
- * "declarative" paradigm, very little robot logic should actually be handled in
- * the {@link Robot}
- * periodic methods (other than the scheduler calls). Instead, the structure of
- * the robot (including
+ * This class is where the bulk of the robot should be declared. Since Command-based is a
+ * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
+ * periodic methods (other than the scheduler calls). Instead, the structure of the robot (including
  * subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
-    // Subsystems
-    private final Vision vision;
-    private final Drive drive;
-    private final Roller roller;
+  // Subsystems
+  private final Vision vision;
+  private final Drive drive;
+  private final Roller roller;
 
-    // Controller
-    private final CommandXboxController controller = new CommandXboxController(0);
+  // Controller
+  private final CommandXboxController controller = new CommandXboxController(0);
 
-    // Dashboard inputs
-    private final LoggedDashboardChooser<Command> autoChooser;
+  // Dashboard inputs
+  private final LoggedDashboardChooser<Command> autoChooser;
 
-    /**
-     * The container for the robot. Contains subsystems, OI devices, and commands.
-     */
-    public RobotContainer() {
-        switch (Constants.currentMode) {
-            case REAL:
-                // Real robot, instantiate hardware IO implementations
-                drive = new Drive(new DriveIOTalonSRX(), new GyroIONavX());
-                roller = new Roller(new RollerIOTalonSRX());
-                vision = new Vision(
-                        drive::addVisionMeasurement,
-                        new VisionIOLimelight(PlayStationCamera, drive::getRotation),
-                        new VisionIOLimelight(ReefCamera, drive::getRotation));
-                // vision =
-                // new Vision(
-                // Drive::addVisionMeasurement,
-                // new VisionIOPhotonVision(camera0Name, robotToCamera0));
-                // new VisionIOPhotonVision(camera1Name, robotToCamera1));
-                break;
+  /** The container for the robot. Contains subsystems, OI devices, and commands. */
+  public RobotContainer() {
+    switch (Constants.currentMode) {
+      case REAL:
+        // Real robot, instantiate hardware IO implementations
+        drive = new Drive(new DriveIOTalonSRX(), new GyroIONavX());
+        roller = new Roller(new RollerIOTalonSRX());
+        vision =
+            new Vision(
+                drive::addVisionMeasurement,
+                new VisionIOLimelight(PlayStationCamera, drive::getRotation),
+                new VisionIOLimelight(ReefCamera, drive::getRotation));
+        // vision =
+        // new Vision(
+        // Drive::addVisionMeasurement,
+        // new VisionIOPhotonVision(camera0Name, robotToCamera0));
+        // new VisionIOPhotonVision(camera1Name, robotToCamera1));
+        break;
 
-            case SIM:
-                // Sim robot, instantiate physics sim IO implementations
-                drive = new Drive(new DriveIOSim(), new GyroIO() {
-                });
-                roller = new Roller(new RollerIOSim());
-                vision = null;
-                break;
+      case SIM:
+        // Sim robot, instantiate physics sim IO implementations
+        drive = new Drive(new DriveIOSim(), new GyroIO() {});
+        roller = new Roller(new RollerIOSim());
+        vision = null;
+        break;
 
-            default:
-                // Replayed robot, disable IO implementations
-                drive = new Drive(new DriveIO() {
-                }, new GyroIO() {
-                });
-                roller = new Roller(new RollerIO() {
-                });
-                vision = new Vision(drive::addVisionMeasurement, new VisionIO() {
-                }, new VisionIO() {
-                });
-                break;
-        }
-
-        DriverStationInterface.getInstance();
-
-        // Set up auto routines
-        NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(3.0));
-        autoChooser = new LoggedDashboardChooser<>(
-                "Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
-
-        if (Constants.tuningMode) {
-            // Set up SysId routines
-            autoChooser.addOption(
-                    "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
-            autoChooser.addOption(
-                    "Drive SysId (Quasistatic Forward)",
-                    drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-            autoChooser.addOption(
-                    "Drive SysId (Quasistatic Reverse)",
-                    drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-            autoChooser.addOption(
-                    "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
-            autoChooser.addOption(
-                    "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
-        }
-        // Configure the button bindings
-        configureButtonBindings();
+      default:
+        // Replayed robot, disable IO implementations
+        drive = new Drive(new DriveIO() {}, new GyroIO() {});
+        roller = new Roller(new RollerIO() {});
+        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
+        break;
     }
 
-    /**
-     * Use this method to define your button->command mappings. Buttons can be
-     * created by
-     * instantiating a {@link GenericHID} or one of its subclasses ({@link
-     * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing
-     * it to a {@link
-     * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
-     */
-    private void configureButtonBindings() {
-        // Default drive command, normal arcade drive
-        drive.setDefaultCommand(
-                DriveCommands.arcadeDrive(
-                        drive, () -> -controller.getLeftY(), () -> -controller.getRightX()));
+    DriverStationInterface.getInstance();
 
-        // Default roller command, control with triggers
-        roller.setDefaultCommand(
-                roller.runTeleop(
-                        () -> controller.getRightTriggerAxis(), () -> controller.getLeftTriggerAxis()));
+    // Set up auto routines
+    NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(3.0));
+    autoChooser =
+        new LoggedDashboardChooser<>(
+            "Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
 
-        controller
-                .start()
-                .onTrue(
-                        Commands.runOnce(
-                                () -> {
-                                    if (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
-                                        drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero));
-                                    } else {
-                                        drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.k180deg));
-                                    }
-                                }));
-
-        final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
-
-        // In configureBindings()
-
-        controller
-                .b()
-                .onTrue(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = new ProxyCommand(() -> DriveCommands.PathfindtoBranch(drive));
-                                    currentPathfindCommand.set(cmd);
-                                    cmd.schedule();
-                                }))
-                .onFalse(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = currentPathfindCommand.getAndSet(null);
-                                    if (cmd != null) {
-                                        cmd.cancel();
-                                    }
-                                }));
-
-        controller
-                .leftBumper()
-                .onTrue(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = new ProxyCommand(
-                                            () -> DriveCommands.PathfindtoPlayerStation(drive, true));
-                                    currentPathfindCommand.set(cmd);
-                                    cmd.schedule();
-                                }))
-                .onFalse(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = currentPathfindCommand.getAndSet(null);
-                                    if (cmd != null) {
-                                        cmd.cancel();
-                                    }
-                                }));
-        controller
-                .rightBumper()
-                .onTrue(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = new ProxyCommand(
-                                            () -> DriveCommands.PathfindtoPlayerStation(drive, false));
-                                    currentPathfindCommand.set(cmd);
-                                    cmd.schedule();
-                                }))
-                .onFalse(
-                        Commands.runOnce(
-                                () -> {
-                                    Command cmd = currentPathfindCommand.getAndSet(null);
-                                    if (cmd != null) {
-                                        cmd.cancel();
-                                    }
-                                }));
+    if (Constants.tuningMode) {
+      // Set up SysId routines
+      autoChooser.addOption(
+          "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
+      autoChooser.addOption(
+          "Drive SysId (Quasistatic Forward)",
+          drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
+      autoChooser.addOption(
+          "Drive SysId (Quasistatic Reverse)",
+          drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
+      autoChooser.addOption(
+          "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
+      autoChooser.addOption(
+          "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
     }
+    // Configure the button bindings
+    configureButtonBindings();
+  }
 
-    /**
-     * Use this to pass the autonomous command to the main {@link Robot} class.
-     *
-     * @return the command to run in autonomous
-     */
-    public Command getAutonomousCommand() {
-        return autoChooser.get();
-    }
+  /**
+   * Use this method to define your button->command mappings. Buttons can be created by
+   * instantiating a {@link GenericHID} or one of its subclasses ({@link
+   * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing it to a {@link
+   * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
+   */
+  private void configureButtonBindings() {
+    // Default drive command, normal arcade drive
+    drive.setDefaultCommand(
+        DriveCommands.arcadeDrive(
+            drive, () -> -controller.getLeftY(), () -> -controller.getRightX()));
+
+    // Default roller command, control with triggers
+    roller.setDefaultCommand(
+        roller.runTeleop(
+            () -> controller.getRightTriggerAxis(), () -> controller.getLeftTriggerAxis()));
+
+    controller
+        .start()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  if (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
+                    drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero));
+                  } else {
+                    drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.k180deg));
+                  }
+                }));
+
+    final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
+
+    // In configureBindings()
+
+    controller
+        .b()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  Command cmd =
+                      Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
+                  currentPathfindCommand.set(cmd);
+                  cmd.schedule();
+                }))
+        .onFalse(
+            Commands.runOnce(
+                () -> {
+                  Command cmd = currentPathfindCommand.getAndSet(null);
+                  if (cmd != null) {
+                    cmd.cancel();
+                  }
+                }));
+
+    controller
+        .leftBumper()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  Command cmd =
+                      Commands.defer(
+                          () -> DriveCommands.PathfindtoPlayerStation(drive, true), Set.of(drive));
+                  currentPathfindCommand.set(cmd);
+                  cmd.schedule();
+                }))
+        .onFalse(
+            Commands.runOnce(
+                () -> {
+                  Command cmd = currentPathfindCommand.getAndSet(null);
+                  if (cmd != null) {
+                    cmd.cancel();
+                  }
+                }));
+    controller
+        .rightBumper()
+        .onTrue(
+            Commands.runOnce(
+                () -> {
+                  Command cmd =
+                      Commands.defer(
+                          () -> DriveCommands.PathfindtoPlayerStation(drive, false), Set.of(drive));
+                  currentPathfindCommand.set(cmd);
+                  cmd.schedule();
+                }))
+        .onFalse(
+            Commands.runOnce(
+                () -> {
+                  Command cmd = currentPathfindCommand.getAndSet(null);
+                  if (cmd != null) {
+                    cmd.cancel();
+                  }
+                }));
+  }
+
+  /**
+   * Use this to pass the autonomous command to the main {@link Robot} class.
+   *
+   * @return the command to run in autonomous
+   */
+  public Command getAutonomousCommand() {
+    return autoChooser.get();
+  }
 }
