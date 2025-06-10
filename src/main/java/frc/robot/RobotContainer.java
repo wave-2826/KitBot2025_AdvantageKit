@@ -41,6 +41,7 @@ import frc.robot.subsystems.roller.RollerIOTalonSRX;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
+import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import frc.robot.util.DriverStationInterface;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
@@ -74,7 +75,7 @@ public class RobotContainer {
         vision =
             new Vision(
                 drive::addVisionMeasurement,
-                new VisionIOLimelight(PlayStationCamera, drive::getRotation),
+                new VisionIOLimelight(PlayerStationCamera, drive::getRotation),
                 new VisionIOLimelight(ReefCamera, drive::getRotation));
         // vision =
         // new Vision(
@@ -87,7 +88,12 @@ public class RobotContainer {
         // Sim robot, instantiate physics sim IO implementations
         drive = new Drive(new DriveIOSim(), new GyroIO() {});
         roller = new Roller(new RollerIOSim());
-        vision = null;
+        vision =
+            new Vision(
+                drive::addVisionMeasurement,
+                new VisionIOPhotonVisionSim(
+                    PlayerStationCamera, PlayerStationCameraPos, drive::getPose),
+                new VisionIOPhotonVisionSim(ReefCamera, ReefCameraPos, drive::getPose));
         break;
 
       default:
