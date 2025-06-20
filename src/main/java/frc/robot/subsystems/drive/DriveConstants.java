@@ -38,7 +38,7 @@ public class DriveConstants {
   public static final DCMotor gearbox = DCMotor.getCIM(2);
 
   // Velocity PID configuration
-  public static final double realKp = 0.0;
+  public static final double realKp = 0.05;
   public static final double realKd = 0.0;
   public static final double realKs = 0.0;
   public static final double realKv = 0.1;

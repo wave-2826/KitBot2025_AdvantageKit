@@ -125,7 +125,8 @@ public class Drive extends SubsystemBase {
     // Update odometry
     poseEstimator.update(rawGyroRotation, getLeftPositionMeters(), getRightPositionMeters());
 
-    if (DriverStation.getAlliance().orElse(Alliance.Blue) == DriverStation.Alliance.Red) {
+    if (DriverStation.getAlliance().orElse(Alliance.Blue) == DriverStation.Alliance.Red
+        && Constants.currentMode == Mode.SIM) {
       DriverStationInterface.getInstance()
           .update(
               getPose()

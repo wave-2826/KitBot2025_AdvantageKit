@@ -64,5 +64,5 @@ public class PathFindConstants {
   public static final double kD = 0.0;
 
   // Max speed constraints (rotational in m/s for tank drive)
-  public static final double maxRotationSpeed = 3.0;
+  public static final double maxRotationSpeed = 1.5;
 }

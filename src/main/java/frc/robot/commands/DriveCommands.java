@@ -23,6 +23,8 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -116,7 +118,15 @@ public class DriveCommands {
   }
 
   public static Command PathfindtoBranch(Drive drive) {
-    Pose2d targetPose = getBranchPose(DriverStationInterface.getInstance().getReefTarget());
+    Pose2d targetPose =
+        (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue)
+            ? getBranchPose(DriverStationInterface.getInstance().getReefTarget())
+            : getBranchPose(DriverStationInterface.getInstance().getReefTarget())
+                .relativeTo(
+                    new Pose2d(
+                        Units.inchesToMeters(690.875),
+                        Units.inchesToMeters(315),
+                        Rotation2d.k180deg));
 
     if (targetPose.equals(new Pose2d(0, 0, Rotation2d.fromDegrees(0)))) {
       Elastic.sendNotification(
@@ -129,7 +139,7 @@ public class DriveCommands {
     }
 
     PathConstraints constraints =
-        new PathConstraints(3.0, 4.0, Units.degreesToRadians(540), Units.degreesToRadians(720));
+        new PathConstraints(1.5, 2, Units.degreesToRadians(540), Units.degreesToRadians(720));
 
     Command pathfindCommand =
         AutoBuilder.pathfindToPose(

@@ -45,8 +45,10 @@ public class DriveIOTalonSRX implements DriveIO {
     tryUntilOkV5(5, () -> rightLeader.configAllSettings(config));
     tryUntilOkV5(5, () -> rightFollower.configAllSettings(config));
 
-    // leftLeader.setInverted(leftInverted);
-    // rightLeader.setInverted(rightInverted);
+    leftLeader.setInverted(leftInverted);
+    rightLeader.setInverted(rightInverted);
+    leftFollower.setInverted(leftInverted);
+    rightFollower.setInverted(rightInverted);
 
     leftFollower.follow(leftLeader);
     rightFollower.follow(rightLeader);

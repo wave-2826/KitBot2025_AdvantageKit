@@ -110,11 +110,7 @@ public class Robot extends LoggedRobot {
   @Override
   public void disabledInit() {
     NetworkTableInstance.getDefault()
-        .getTable("limelight-ps")
-        .getEntry("set_throttle")
-        .setInteger(100);
-    NetworkTableInstance.getDefault()
-        .getTable("limelight-reef")
+        .getTable("limelight")
         .getEntry("set_throttle")
         .setInteger(100);
   }
