@@ -42,7 +42,6 @@ import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
-import frc.robot.util.DriverStationInterface;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
@@ -60,7 +59,9 @@ public class RobotContainer {
   private final Roller roller;
 
   // Controller
-  private final CommandXboxController controller = new CommandXboxController(0);
+  private final CommandXboxController driveController = new CommandXboxController(0);
+  private final CommandXboxController opperatorController =
+      new CommandXboxController(Constants.twoDriverMode ? 1 : 0);
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -77,11 +78,6 @@ public class RobotContainer {
                 drive::addVisionMeasurement,
                 new VisionIOLimelight(PlayerStationCamera, drive::getRotation),
                 new VisionIOLimelight(ReefCamera, drive::getRotation));
-        // vision =
-        // new Vision(
-        // Drive::addVisionMeasurement,
-        // new VisionIOPhotonVision(camera0Name, robotToCamera0));
-        // new VisionIOPhotonVision(camera1Name, robotToCamera1));
         break;
 
       case SIM:
@@ -104,10 +100,8 @@ public class RobotContainer {
         break;
     }
 
-    DriverStationInterface.getInstance();
-
     // Set up auto routines
-    NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(3.0));
+    NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(1.5));
     autoChooser =
         new LoggedDashboardChooser<>(
             "Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
@@ -141,14 +135,17 @@ public class RobotContainer {
     // Default drive command, normal arcade drive
     drive.setDefaultCommand(
         DriveCommands.arcadeDrive(
-            drive, () -> -controller.getLeftY(), () -> -controller.getRightX()));
+            drive, () -> -driveController.getLeftY(), () -> -driveController.getRightX()));
 
     // Default roller command, control with triggers
     roller.setDefaultCommand(
         roller.runTeleop(
-            () -> controller.getRightTriggerAxis(), () -> controller.getLeftTriggerAxis()));
+            () -> opperatorController.getRightTriggerAxis(),
+            () -> opperatorController.getLeftTriggerAxis()));
 
-    controller
+    opperatorController.a().whileTrue(roller.runPercent(1.0));
+
+    driveController
         .start()
         .onTrue(
             Commands.runOnce(
@@ -164,7 +161,7 @@ public class RobotContainer {
 
     // In configureBindings()
 
-    controller
+    driveController
         .b()
         .onTrue(
             Commands.runOnce(
@@ -183,7 +180,7 @@ public class RobotContainer {
                   }
                 }));
 
-    controller
+    driveController
         .leftBumper()
         .onTrue(
             Commands.runOnce(
@@ -202,7 +199,7 @@ public class RobotContainer {
                     cmd.cancel();
                   }
                 }));
-    controller
+    driveController
         .rightBumper()
         .onTrue(
             Commands.runOnce(

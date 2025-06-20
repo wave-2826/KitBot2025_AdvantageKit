@@ -35,6 +35,8 @@ public final class Constants {
 
   public static final Mode currentMode = RobotBase.isReal() ? Mode.REAL : simMode;
 
+  public static final boolean twoDriverMode = false;
+
   public static enum Mode {
     /** Running on a real robot. */
     REAL,
