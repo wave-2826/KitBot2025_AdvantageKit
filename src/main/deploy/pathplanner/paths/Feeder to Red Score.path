@@ -3,25 +3,25 @@
   "waypoints": [
     {
       "anchor": {
-        "x": 1.683799342105263,
-        "y": 0.7824835526315792
+        "x": 1.501,
+        "y": 0.61
       },
       "prevControl": null,
       "nextControl": {
-        "x": 2.7902960526315788,
-        "y": 1.8889802631578951
+        "x": 2.6074967105263154,
+        "y": 1.7164967105263158
       },
       "isLocked": false,
-      "linkedName": null
+      "linkedName": "Red Feeder"
     },
     {
       "anchor": {
-        "x": 4.031496710526316,
-        "y": 2.8126644736842104
+        "x": 4.053679780556464,
+        "y": 2.9131378709610307
       },
       "prevControl": {
-        "x": 3.2136513157894733,
-        "y": 1.4078947368421053
+        "x": 3.2358343858196212,
+        "y": 1.5083681341189257
       },
       "nextControl": null,
       "isLocked": false,
@@ -42,13 +42,13 @@
   },
   "goalEndState": {
     "velocity": 0,
-    "rotation": 0.0
+    "rotation": 59.99999999999999
   },
   "reversed": false,
   "folder": null,
   "idealStartingState": {
     "velocity": 0,
-    "rotation": 0.0
+    "rotation": 55.0
   },
   "useDefaultConstraints": true
 }

@@ -3,25 +3,25 @@
   "waypoints": [
     {
       "anchor": {
-        "x": 1.683799342105263,
-        "y": 7.3541118421052625
+        "x": 1.5013992699291352,
+        "y": 7.419418559335703
       },
       "prevControl": null,
       "nextControl": {
-        "x": 2.2514802631578945,
-        "y": 6.51702302631579
+        "x": 2.069080190981767,
+        "y": 6.5823297435462305
       },
       "isLocked": false,
       "linkedName": "Blue Feeder"
     },
     {
       "anchor": {
-        "x": 3.9667808219178085,
-        "y": 5.279644691780822
+        "x": 4.050106783033687,
+        "y": 5.144781871906107
       },
       "prevControl": {
-        "x": 3.553047269286229,
-        "y": 6.030138112833455
+        "x": 3.636373230402108,
+        "y": 5.89527529295874
       },
       "nextControl": null,
       "isLocked": false,
@@ -42,13 +42,13 @@
   },
   "goalEndState": {
     "velocity": 0,
-    "rotation": 0.0
+    "rotation": -59.99999999999999
   },
   "reversed": false,
   "folder": null,
   "idealStartingState": {
     "velocity": 0,
-    "rotation": 0.0
+    "rotation": -55.0
   },
   "useDefaultConstraints": true
 }

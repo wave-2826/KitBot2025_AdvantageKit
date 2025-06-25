@@ -3,10 +3,7 @@ package frc.robot.util;
 import frc.robot.FieldConstants.ReefBranch;
 import frc.robot.FieldConstants.ReefLevel;
 
-public record ReefTarget(ReefBranch branch, ReefLevel level, boolean isAlgaePosition) {
-  public ReefTarget(ReefBranch branch, ReefLevel level) {
-    this(branch, level, false);
-  }
+public record ReefTarget(ReefBranch branch, ReefLevel level) {
 
   @Override
   public boolean equals(Object obj) {
@@ -23,9 +20,5 @@ public record ReefTarget(ReefBranch branch, ReefLevel level, boolean isAlgaePosi
   @Override
   public final String toString() {
     return level.toString() + branch.toString();
-  }
-
-  public ReefTarget asAlgae() {
-    return new ReefTarget(branch, level, true);
   }
 }

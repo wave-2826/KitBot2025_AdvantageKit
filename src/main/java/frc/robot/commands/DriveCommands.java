@@ -13,62 +13,164 @@
 
 package frc.robot.commands;
 
-import static frc.robot.subsystems.drive.DriveConstants.maxSpeedMetersPerSec;
+import static edu.wpi.first.units.Units.Meters;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.ProfiledPIDController;
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Timer;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.FieldConstants;
 import frc.robot.subsystems.drive.Drive;
-import frc.robot.subsystems.drive.PathFindConstants;
+import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.util.DriverStationInterface;
 import frc.robot.util.Elastic;
+import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.ReefTarget;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 public class DriveCommands {
   private static final double DEADBAND = 0.1;
+  private static final double ANGLE_KP = 5.0;
+  private static final double ANGLE_KD = 0.4;
+  private static final double ANGLE_MAX_VELOCITY = 8.0;
+  private static final double ANGLE_MAX_ACCELERATION = 20.0;
+  private static final double FF_START_DELAY = 2.0; // Secs
   private static final double FF_RAMP_RATE = 0.1; // Volts/Sec
+  private static final double WHEEL_RADIUS_MAX_VELOCITY = 0.25; // Rad/Sec
+  private static final double WHEEL_RADIUS_RAMP_RATE = 0.05; // Rad/Sec^2
 
   private DriveCommands() {}
 
+  private static Translation2d getLinearVelocityFromJoysticks(double x, double y) {
+    // Apply deadband
+    double linearMagnitude = MathUtil.applyDeadband(Math.hypot(x, y), DEADBAND);
+    Rotation2d linearDirection = new Rotation2d(Math.atan2(y, x));
+
+    // Square magnitude for more precise control
+    linearMagnitude = linearMagnitude * linearMagnitude;
+
+    // Return new linear velocity
+    return new Pose2d(new Translation2d(), linearDirection)
+        .transformBy(new Transform2d(linearMagnitude, 0.0, new Rotation2d()))
+        .getTranslation();
+  }
+
   /**
-   * Standard joystick drive, where X is the forward-backward axis (positive = forward) and Z is the
-   * left-right axis (positive = counter-clockwise).
+   * Field relative drive command using two joysticks (controlling linear and angular velocities).
    */
-  public static Command arcadeDrive(
-      Drive drive, DoubleSupplier xSupplier, DoubleSupplier zSupplier) {
+  public static Command joystickDrive(
+      Drive drive,
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      DoubleSupplier omegaSupplier) {
     return Commands.run(
         () -> {
-          // Apply deadband
-          double x = MathUtil.applyDeadband(xSupplier.getAsDouble(), DEADBAND);
-          double z = MathUtil.applyDeadband(zSupplier.getAsDouble(), DEADBAND);
+          // Get linear velocity
+          Translation2d linearVelocity =
+              getLinearVelocityFromJoysticks(xSupplier.getAsDouble(), ySupplier.getAsDouble());
 
-          // Calculate speeds
-          var speeds = DifferentialDrive.arcadeDriveIK(x, z, true);
+          // Apply rotation deadband
+          double omega = MathUtil.applyDeadband(omegaSupplier.getAsDouble(), DEADBAND);
 
-          // Apply output
-          drive.runClosedLoop(
-              speeds.left * maxSpeedMetersPerSec, speeds.right * maxSpeedMetersPerSec);
+          // Square rotation value for more precise control
+          omega = Math.copySign(omega * omega, omega);
+
+          // Convert to field relative speeds & send command
+          ChassisSpeeds speeds =
+              new ChassisSpeeds(
+                  linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
+                  linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
+                  omega * drive.getMaxAngularSpeedRadPerSec());
+          boolean isFlipped =
+              DriverStation.getAlliance().isPresent()
+                  && DriverStation.getAlliance().get() == Alliance.Red;
+          drive.runVelocity(
+              ChassisSpeeds.fromFieldRelativeSpeeds(
+                  speeds,
+                  isFlipped
+                      ? drive.getRotation().plus(new Rotation2d(Math.PI))
+                      : drive.getRotation()));
         },
         drive);
   }
 
-  /** Measures the velocity feedforward constants for the drive. */
+  /**
+   * Field relative drive command using joystick for linear control and PID for angular control.
+   * Possible use cases include snapping to an angle, aiming at a vision target, or controlling
+   * absolute rotation with a joystick.
+   */
+  public static Command joystickDriveAtAngle(
+      Drive drive,
+      DoubleSupplier xSupplier,
+      DoubleSupplier ySupplier,
+      Supplier<Rotation2d> rotationSupplier) {
+
+    // Create PID controller
+    ProfiledPIDController angleController =
+        new ProfiledPIDController(
+            ANGLE_KP,
+            0.0,
+            ANGLE_KD,
+            new TrapezoidProfile.Constraints(ANGLE_MAX_VELOCITY, ANGLE_MAX_ACCELERATION));
+    angleController.enableContinuousInput(-Math.PI, Math.PI);
+
+    // Construct command
+    return Commands.run(
+            () -> {
+              // Get linear velocity
+              Translation2d linearVelocity =
+                  getLinearVelocityFromJoysticks(xSupplier.getAsDouble(), ySupplier.getAsDouble());
+
+              // Calculate angular speed
+              double omega =
+                  angleController.calculate(
+                      drive.getRotation().getRadians(), rotationSupplier.get().getRadians());
+
+              // Convert to field relative speeds & send command
+              ChassisSpeeds speeds =
+                  new ChassisSpeeds(
+                      linearVelocity.getX() * drive.getMaxLinearSpeedMetersPerSec(),
+                      linearVelocity.getY() * drive.getMaxLinearSpeedMetersPerSec(),
+                      omega);
+              boolean isFlipped =
+                  DriverStation.getAlliance().isPresent()
+                      && DriverStation.getAlliance().get() == Alliance.Red;
+              drive.runVelocity(
+                  ChassisSpeeds.fromFieldRelativeSpeeds(
+                      speeds,
+                      isFlipped
+                          ? drive.getRotation().plus(new Rotation2d(Math.PI))
+                          : drive.getRotation()));
+            },
+            drive)
+
+        // Reset PID controller when command starts
+        .beforeStarting(() -> angleController.reset(drive.getRotation().getRadians()));
+  }
+
+  /**
+   * Measures the velocity feedforward constants for the drive motors.
+   *
+   * <p>This command should only be used in voltage control mode.
+   */
   public static Command feedforwardCharacterization(Drive drive) {
     List<Double> velocitySamples = new LinkedList<>();
     List<Double> voltageSamples = new LinkedList<>();
@@ -80,15 +182,25 @@ public class DriveCommands {
             () -> {
               velocitySamples.clear();
               voltageSamples.clear();
-              timer.restart();
             }),
+
+        // Allow modules to orient
+        Commands.run(
+                () -> {
+                  drive.runCharacterization(0.0);
+                },
+                drive)
+            .withTimeout(FF_START_DELAY),
+
+        // Start timer
+        Commands.runOnce(timer::restart),
 
         // Accelerate and gather data
         Commands.run(
                 () -> {
                   double voltage = timer.get() * FF_RAMP_RATE;
-                  drive.runOpenLoop(voltage, voltage);
-                  velocitySamples.add(drive.getCharacterizationVelocity());
+                  drive.runCharacterization(voltage);
+                  velocitySamples.add(drive.getFFCharacterizationVelocity());
                   voltageSamples.add(voltage);
                 },
                 drive)
@@ -117,223 +229,148 @@ public class DriveCommands {
                 }));
   }
 
+  /** Measures the robot's wheel radius by spinning in a circle. */
+  public static Command wheelRadiusCharacterization(Drive drive) {
+    SlewRateLimiter limiter = new SlewRateLimiter(WHEEL_RADIUS_RAMP_RATE);
+    WheelRadiusCharacterizationState state = new WheelRadiusCharacterizationState();
+
+    return Commands.parallel(
+        // Drive control sequence
+        Commands.sequence(
+            // Reset acceleration limiter
+            Commands.runOnce(
+                () -> {
+                  limiter.reset(0.0);
+                }),
+
+            // Turn in place, accelerating up to full speed
+            Commands.run(
+                () -> {
+                  double speed = limiter.calculate(WHEEL_RADIUS_MAX_VELOCITY);
+                  drive.runVelocity(new ChassisSpeeds(0.0, 0.0, speed));
+                },
+                drive)),
+
+        // Measurement sequence
+        Commands.sequence(
+            // Wait for modules to fully orient before starting measurement
+            Commands.waitSeconds(1.0),
+
+            // Record starting measurement
+            Commands.runOnce(
+                () -> {
+                  state.positions = drive.getWheelRadiusCharacterizationPositions();
+                  state.lastAngle = drive.getRotation();
+                  state.gyroDelta = 0.0;
+                }),
+
+            // Update gyro delta
+            Commands.run(
+                    () -> {
+                      var rotation = drive.getRotation();
+                      state.gyroDelta += Math.abs(rotation.minus(state.lastAngle).getRadians());
+                      state.lastAngle = rotation;
+                    })
+
+                // When cancelled, calculate and print results
+                .finallyDo(
+                    () -> {
+                      double[] positions = drive.getWheelRadiusCharacterizationPositions();
+                      double wheelDelta = 0.0;
+                      for (int i = 0; i < 4; i++) {
+                        wheelDelta += Math.abs(positions[i] - state.positions[i]) / 4.0;
+                      }
+                      double wheelRadius =
+                          (state.gyroDelta * DriveConstants.driveBaseRadius) / wheelDelta;
+
+                      NumberFormat formatter = new DecimalFormat("#0.000");
+                      System.out.println(
+                          "********** Wheel Radius Characterization Results **********");
+                      System.out.println(
+                          "\tWheel Delta: " + formatter.format(wheelDelta) + " radians");
+                      System.out.println(
+                          "\tGyro Delta: " + formatter.format(state.gyroDelta) + " radians");
+                      System.out.println(
+                          "\tWheel Radius: "
+                              + formatter.format(wheelRadius)
+                              + " meters, "
+                              + formatter.format(Units.metersToInches(wheelRadius))
+                              + " inches");
+                    })));
+  }
+
+  private static class WheelRadiusCharacterizationState {
+    double[] positions = new double[4];
+    Rotation2d lastAngle = new Rotation2d();
+    double gyroDelta = 0.0;
+  }
+
+  private static final LoggedTunableNumber[] lineupDistances =
+      new LoggedTunableNumber[] {
+        new LoggedTunableNumber("AutoScore/L1ReefLineupDistance", 5),
+        new LoggedTunableNumber("AutoScore/L2ReefLineupDistance", 21),
+        new LoggedTunableNumber("AutoScore/L3ReefLineupDistance", 21),
+        new LoggedTunableNumber("AutoScore/L4ReefLineupDistance", 25.5)
+      };
+
+  private static final LoggedTunableNumber centerDistanceTweak =
+      new LoggedTunableNumber( //
+          "AutoScore/CenterDistanceTweak", 0.0);
+  private static final LoggedTunableNumber centerDistanceTweakRight =
+      new LoggedTunableNumber( //
+          "AutoScore/CenterPositionTweakRight", -0.25);
+
+  public static Pose2d getLineupPose(ReefTarget target) {
+    return getLineupPose(target, 0.);
+  }
+
+  private static Pose2d getLineupPose(ReefTarget target, double offsetOutwardInches) {
+    double distanceAwayInches;
+    distanceAwayInches = lineupDistances[target.level().ordinal()].get();
+    distanceAwayInches += offsetOutwardInches;
+
+    double centerDistance =
+        FieldConstants.reefBranchSeparation.in(Meters) / 2.
+            + Units.inchesToMeters(centerDistanceTweak.get());
+    boolean isLeft = target.branch().isLeft;
+    double horizontalOffset = (isLeft ? -centerDistance : centerDistance);
+
+    Transform2d tagRelativeOffset =
+        new Transform2d(
+            new Translation2d(
+                Units.inchesToMeters(distanceAwayInches),
+                horizontalOffset + Units.inchesToMeters(centerDistanceTweakRight.get())),
+            Rotation2d.k180deg);
+    Pose2d fieldPose = target.branch().face.getTagPose().transformBy(tagRelativeOffset);
+
+    return fieldPose;
+  }
+
   public static Command PathfindtoBranch(Drive drive) {
+    DriverStationInterface.getInstance()
+        .setReefTarget(
+            new ReefTarget(
+                DriverStationInterface.getInstance().getReefTarget().branch(),
+                FieldConstants.ReefLevel.L1));
     Pose2d targetPose =
-        (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue)
-            ? getBranchPose(DriverStationInterface.getInstance().getReefTarget())
-            : getBranchPose(DriverStationInterface.getInstance().getReefTarget())
-                .relativeTo(
-                    new Pose2d(
-                        Units.inchesToMeters(690.875),
-                        Units.inchesToMeters(315),
-                        Rotation2d.k180deg));
+        getLineupPose(
+            new ReefTarget(
+                DriverStationInterface.getInstance().getReefTarget().branch(),
+                FieldConstants.ReefLevel.L1));
 
-    if (targetPose.equals(new Pose2d(0, 0, Rotation2d.fromDegrees(0)))) {
-      Elastic.sendNotification(
-          new Elastic.Notification(
-              Elastic.Notification.NotificationLevel.ERROR,
-              "Cannot pathfind to branch",
-              "Invalid branch selected: "
-                  + DriverStationInterface.getInstance().getReefTarget().branch()));
-      return Commands.none();
-    }
+    Elastic.sendNotification(
+        new Elastic.Notification(
+            Elastic.Notification.NotificationLevel.INFO, "Target Pose", targetPose.toString()));
 
     PathConstraints constraints =
-        new PathConstraints(1.5, 2, Units.degreesToRadians(540), Units.degreesToRadians(720));
+        new PathConstraints(
+            DriveConstants.maxSpeedMetersPerSec,
+            6.9,
+            (DriveConstants.maxSpeedMetersPerSec / 2.0),
+            1446);
 
-    Command pathfindCommand =
-        AutoBuilder.pathfindToPose(
-            targetPose, constraints, 0.0 // Goal end velocity
-            );
+    Command pathfindingCommand = AutoBuilder.pathfindToPose(targetPose, constraints, 0);
 
-    PIDController rotationController =
-        new PIDController(PathFindConstants.kP, PathFindConstants.kI, PathFindConstants.kD);
-    rotationController.enableContinuousInput(-180.0, 180.0);
-
-    Command rotationCommand =
-        Commands.run(
-                () -> {
-                  double currentAngle = drive.getRotation().getDegrees();
-                  double targetAngle = targetPose.getRotation().getDegrees();
-                  double rotationOutput = rotationController.calculate(currentAngle, targetAngle);
-                  rotationOutput = MathUtil.clamp(rotationOutput, -1.0, 1.0);
-                  double left = -rotationOutput * PathFindConstants.maxRotationSpeed;
-                  double right = rotationOutput * PathFindConstants.maxRotationSpeed;
-                  drive.runOpenLoop(left, right);
-                },
-                drive)
-            .until(
-                () ->
-                    Math.abs(
-                            drive.getRotation().getDegrees()
-                                - targetPose.getRotation().getDegrees())
-                        < 1.2)
-            .finallyDo(() -> rotationController.close());
-
-    PIDController approachController =
-        new PIDController(PathFindConstants.kP, PathFindConstants.kI, PathFindConstants.kD);
-
-    Command approachCommand =
-        Commands.run(
-                () -> {
-                  double distanceToTarget =
-                      drive.getPose().getTranslation().getDistance(targetPose.getTranslation());
-                  double output = approachController.calculate(distanceToTarget, 0.2);
-                  output = MathUtil.clamp(output, -1.0, 1.0);
-                  double speed = output * PathFindConstants.maxRotationSpeed;
-                  drive.runOpenLoop(speed, speed);
-                },
-                drive)
-            .until(
-                () -> {
-                  double actualDistance =
-                      drive
-                          .getPose()
-                          .getTranslation()
-                          .plus(getReefFace(DriverStationInterface.getInstance().getReefTarget()))
-                          .getDistance(targetPose.getTranslation());
-                  return actualDistance < 0.1;
-                })
-            .finallyDo(() -> approachController.close());
-
-    return Commands.sequence(pathfindCommand, rotationCommand, approachCommand);
-  }
-
-  public static Command PathfindtoPlayerStation(Drive drive, boolean isLeft) {
-    Pose2d PlayStationSidePose = isLeft ? PathFindConstants.PSLeft : PathFindConstants.PSRight;
-    Pose2d targetPose =
-        (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue)
-            ? PlayStationSidePose
-            : PlayStationSidePose.relativeTo(
-                new Pose2d(
-                    Units.inchesToMeters(690.875), Units.inchesToMeters(315), Rotation2d.k180deg));
-
-    if (targetPose.equals(new Pose2d(0, 0, Rotation2d.fromDegrees(0)))) {
-      Elastic.sendNotification(
-          new Elastic.Notification(
-              Elastic.Notification.NotificationLevel.ERROR,
-              "Pathfind to Player Station",
-              "Invalid player station selected: " + (isLeft ? "Right" : "Left")));
-      return Commands.none();
-    }
-
-    PathConstraints constraints =
-        new PathConstraints(1.5, 2.0, Units.degreesToRadians(540), Units.degreesToRadians(720));
-
-    Command pathfindCommand =
-        AutoBuilder.pathfindToPose(
-            targetPose, constraints, 0.0 // Goal end velocity
-            );
-
-    PIDController rotationController =
-        new PIDController(PathFindConstants.kP, PathFindConstants.kI, PathFindConstants.kD);
-    rotationController.enableContinuousInput(-180.0, 180.0);
-
-    Command rotationCommand =
-        Commands.run(
-                () -> {
-                  double currentAngle = drive.getRotation().getDegrees();
-                  double targetAngle = targetPose.getRotation().getDegrees();
-                  double rotationOutput = rotationController.calculate(currentAngle, targetAngle);
-                  rotationOutput = MathUtil.clamp(rotationOutput, -1.0, 1.0);
-                  double left = -rotationOutput * PathFindConstants.maxRotationSpeed;
-                  double right = rotationOutput * PathFindConstants.maxRotationSpeed;
-                  drive.runOpenLoop(left, right);
-                },
-                drive)
-            .until(
-                () ->
-                    Math.abs(
-                            drive.getRotation().getDegrees()
-                                - targetPose.getRotation().getDegrees())
-                        < 1.2)
-            .finallyDo(() -> rotationController.close());
-
-    PIDController approachController =
-        new PIDController(PathFindConstants.kP, PathFindConstants.kI, PathFindConstants.kD);
-
-    Command approachCommand =
-        Commands.run(
-                () -> {
-                  double distanceToTarget =
-                      drive.getPose().getTranslation().getDistance(targetPose.getTranslation());
-                  double output = approachController.calculate(distanceToTarget, 0.2);
-                  output = MathUtil.clamp(output, -1.0, 1.0);
-                  double speed = output * PathFindConstants.maxRotationSpeed;
-                  drive.runOpenLoop(-speed, -speed);
-                },
-                drive)
-            .until(
-                () -> {
-                  double actualDistance =
-                      drive
-                          .getPose()
-                          .getTranslation()
-                          .plus(
-                              isLeft
-                                  ? PathFindConstants.PlayerStationRightOffset.getTranslation()
-                                  : PathFindConstants.PlayerStationLeftOffset.getTranslation())
-                          .getDistance(targetPose.getTranslation());
-                  return actualDistance < 0.1;
-                })
-            .finallyDo(() -> approachController.close());
-
-    return Commands.sequence(pathfindCommand, rotationCommand, approachCommand);
-  }
-
-  private static Pose2d getBranchPose(ReefTarget reefTarget) {
-    switch (reefTarget.branch()) {
-      case A:
-        return PathFindConstants.A;
-      case B:
-        return PathFindConstants.B;
-      case C:
-        return PathFindConstants.C;
-      case D:
-        return PathFindConstants.D;
-      case E:
-        return PathFindConstants.E;
-      case F:
-        return PathFindConstants.F;
-      case G:
-        return PathFindConstants.G;
-      case H:
-        return PathFindConstants.H;
-      case I:
-        return PathFindConstants.I;
-      case J:
-        return PathFindConstants.J;
-      case K:
-        return PathFindConstants.K;
-      case L:
-        return PathFindConstants.L;
-      default:
-        return new Pose2d(0, 0, Rotation2d.fromDegrees(0));
-    }
-  }
-
-  private static Translation2d getReefFace(ReefTarget reefTarget) {
-    switch (reefTarget.branch()) {
-      case A:
-      case B:
-        return PathFindConstants.FrontOffset.getTranslation();
-      case C:
-      case D:
-        return PathFindConstants.FrontRightOffset.getTranslation();
-      case E:
-      case F:
-        return PathFindConstants.BackRightOffset.getTranslation();
-      case G:
-      case H:
-        return PathFindConstants.BackOffset.getTranslation();
-      case I:
-      case J:
-        return PathFindConstants.BackLeftOffset.getTranslation();
-      case K:
-      case L:
-        return PathFindConstants.FrontLeftOffset.getTranslation();
-      default:
-        return new Translation2d(0, 0);
-    }
+    return Commands.sequence(pathfindingCommand);
   }
 }

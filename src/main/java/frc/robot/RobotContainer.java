@@ -23,17 +23,18 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
 import frc.robot.subsystems.drive.Drive;
-import frc.robot.subsystems.drive.DriveIO;
-import frc.robot.subsystems.drive.DriveIOSim;
-import frc.robot.subsystems.drive.DriveIOTalonSRX;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIONavX;
+import frc.robot.subsystems.drive.ModuleIO;
+import frc.robot.subsystems.drive.ModuleIOSim;
+import frc.robot.subsystems.drive.ModuleIOSpark;
 import frc.robot.subsystems.roller.Roller;
 import frc.robot.subsystems.roller.RollerIO;
 import frc.robot.subsystems.roller.RollerIOSim;
@@ -71,7 +72,13 @@ public class RobotContainer {
     switch (Constants.currentMode) {
       case REAL:
         // Real robot, instantiate hardware IO implementations
-        drive = new Drive(new DriveIOTalonSRX(), new GyroIONavX());
+        drive =
+            new Drive(
+                new GyroIONavX(),
+                new ModuleIOSpark(0),
+                new ModuleIOSpark(1),
+                new ModuleIOSpark(2),
+                new ModuleIOSpark(3));
         roller = new Roller(new RollerIOTalonSRX());
         vision =
             new Vision(
@@ -82,7 +89,13 @@ public class RobotContainer {
 
       case SIM:
         // Sim robot, instantiate physics sim IO implementations
-        drive = new Drive(new DriveIOSim(), new GyroIO() {});
+        drive =
+            new Drive(
+                new GyroIO() {},
+                new ModuleIOSim(),
+                new ModuleIOSim(),
+                new ModuleIOSim(),
+                new ModuleIOSim());
         roller = new Roller(new RollerIOSim());
         vision =
             new Vision(
@@ -94,11 +107,29 @@ public class RobotContainer {
 
       default:
         // Replayed robot, disable IO implementations
-        drive = new Drive(new DriveIO() {}, new GyroIO() {});
+        drive =
+            new Drive(
+                new GyroIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {},
+                new ModuleIO() {});
         roller = new Roller(new RollerIO() {});
         vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
         break;
     }
+
+    final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
+
+    SmartDashboard.putData(
+        "Pathfind",
+        Commands.runOnce(
+            () -> {
+              Command cmd =
+                  Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
+              currentPathfindCommand.set(cmd);
+              cmd.schedule();
+            }));
 
     // Set up auto routines
     NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(1.5));
@@ -134,8 +165,11 @@ public class RobotContainer {
   private void configureButtonBindings() {
     // Default drive command, normal arcade drive
     drive.setDefaultCommand(
-        DriveCommands.arcadeDrive(
-            drive, () -> -driveController.getLeftY(), () -> -driveController.getRightX()));
+        DriveCommands.joystickDrive(
+            drive,
+            () -> -driveController.getLeftY(),
+            () -> -driveController.getLeftX(),
+            () -> -driveController.getRightX()));
 
     // Default roller command, control with triggers
     roller.setDefaultCommand(
@@ -179,45 +213,46 @@ public class RobotContainer {
                     cmd.cancel();
                   }
                 }));
-
-    driveController
-        .leftBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  Command cmd =
-                      Commands.defer(
-                          () -> DriveCommands.PathfindtoPlayerStation(drive, true), Set.of(drive));
-                  currentPathfindCommand.set(cmd);
-                  cmd.schedule();
-                }))
-        .onFalse(
-            Commands.runOnce(
-                () -> {
-                  Command cmd = currentPathfindCommand.getAndSet(null);
-                  if (cmd != null) {
-                    cmd.cancel();
-                  }
-                }));
-    driveController
-        .rightBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  Command cmd =
-                      Commands.defer(
-                          () -> DriveCommands.PathfindtoPlayerStation(drive, false), Set.of(drive));
-                  currentPathfindCommand.set(cmd);
-                  cmd.schedule();
-                }))
-        .onFalse(
-            Commands.runOnce(
-                () -> {
-                  Command cmd = currentPathfindCommand.getAndSet(null);
-                  if (cmd != null) {
-                    cmd.cancel();
-                  }
-                }));
+    /*
+     * driveController
+     * .leftBumper()
+     * .onTrue(
+     * Commands.runOnce(
+     * () -> {
+     * Command cmd =
+     * Commands.defer(
+     * () -> DriveCommands.PathfindtoPlayerStation(drive, true), Set.of(drive));
+     * currentPathfindCommand.set(cmd);
+     * cmd.schedule();
+     * }))
+     * .onFalse(
+     * Commands.runOnce(
+     * () -> {
+     * Command cmd = currentPathfindCommand.getAndSet(null);
+     * if (cmd != null) {
+     * cmd.cancel();
+     * }
+     * }));
+     * driveController
+     * .rightBumper()
+     * .onTrue(
+     * Commands.runOnce(
+     * () -> {
+     * Command cmd =
+     * Commands.defer(
+     * () -> DriveCommands.PathfindtoPlayerStation(drive, false), Set.of(drive));
+     * currentPathfindCommand.set(cmd);
+     * cmd.schedule();
+     * }))
+     * .onFalse(
+     * Commands.runOnce(
+     * () -> {
+     * Command cmd = currentPathfindCommand.getAndSet(null);
+     * if (cmd != null) {
+     * cmd.cancel();
+     * }
+     * }));
+     */
   }
 
   /**
