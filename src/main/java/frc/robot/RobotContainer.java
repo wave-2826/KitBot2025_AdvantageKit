@@ -1,37 +1,25 @@
-// Copyright 2021-2025 FRC 6328
-// http://github.com/Mechanical-Advantage
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// version 3 as published by the Free Software Foundation or
-// available in the root directory of this project.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
 package frc.robot;
-
-import static frc.robot.subsystems.vision.VisionConstants.*;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
+
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
+import frc.robot.commands.drive.DriveTuningCommands;
+import frc.robot.commands.vision.VisionTuningCommands;
 import frc.robot.subsystems.drive.Drive;
+import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.subsystems.drive.GyroIO;
 import frc.robot.subsystems.drive.GyroIONavX;
+import frc.robot.subsystems.drive.GyroIOSim;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOSpark;
@@ -40,215 +28,194 @@ import frc.robot.subsystems.roller.RollerIO;
 import frc.robot.subsystems.roller.RollerIOSim;
 import frc.robot.subsystems.roller.RollerIOTalonSRX;
 import frc.robot.subsystems.vision.Vision;
+import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.ironmaple.simulation.SimulatedArena;
+import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
+import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
- * This class is where the bulk of the robot should be declared. Since Command-based is a
- * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
- * periodic methods (other than the scheduler calls). Instead, the structure of the robot (including
- * subsystems, commands, and button mappings) should be declared here.
+ * This class is where the bulk of the robot should be declared. Since Command-based is a "declarative" paradigm, very
+ * little robot logic should actually be handled in the {@link Robot} periodic methods (other than the scheduler calls).
+ * Instead, the structure of the robot (including subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
-  // Subsystems
-  private final Vision vision;
-  private final Drive drive;
-  private final Roller roller;
+    // Subsystems
+    private final Vision vision;
+    private final Drive drive;
+    private final Roller roller;
 
-  // Controller
-  private final CommandXboxController driveController = new CommandXboxController(0);
-  private final CommandXboxController opperatorController =
-      new CommandXboxController(Constants.twoDriverMode ? 1 : 0);
+    // Only used in simulation
+    private SwerveDriveSimulation driveSimulation = null;
 
-  // Dashboard inputs
-  private final LoggedDashboardChooser<Command> autoChooser;
+    // Controllers
+    private final CommandXboxController driveController = new CommandXboxController(0);
+    private final CommandXboxController opperatorController = new CommandXboxController(
+        Constants.twoDriverMode ? 1 : 0);
 
-  /** The container for the robot. Contains subsystems, OI devices, and commands. */
-  public RobotContainer() {
-    switch (Constants.currentMode) {
-      case REAL:
-        // Real robot, instantiate hardware IO implementations
-        drive =
-            new Drive(
-                new GyroIONavX(),
-                new ModuleIOSpark(0),
-                new ModuleIOSpark(1),
-                new ModuleIOSpark(2),
-                new ModuleIOSpark(3));
-        roller = new Roller(new RollerIOTalonSRX());
-        vision =
-            new Vision(
-                drive::addVisionMeasurement,
-                new VisionIOLimelight(PlayerStationCamera, drive::getRotation),
-                new VisionIOLimelight(ReefCamera, drive::getRotation));
-        break;
+    // Dashboard inputs
+    private final LoggedDashboardChooser<Command> autoChooser;
 
-      case SIM:
-        // Sim robot, instantiate physics sim IO implementations
-        drive =
-            new Drive(
-                new GyroIO() {},
-                new ModuleIOSim(),
-                new ModuleIOSim(),
-                new ModuleIOSim(),
-                new ModuleIOSim());
-        roller = new Roller(new RollerIOSim());
-        vision =
-            new Vision(
-                drive::addVisionMeasurement,
-                new VisionIOPhotonVisionSim(
-                    PlayerStationCamera, PlayerStationCameraPos, drive::getPose),
-                new VisionIOPhotonVisionSim(ReefCamera, ReefCameraPos, drive::getPose));
-        break;
+    /**
+     * The container for the robot. Contains subsystems, OI devices, and commands.
+     */
+    public RobotContainer() {
+        switch(Constants.currentMode) {
+            case REAL:
+                // Real robot, instantiate hardware IO implementations
+                drive = new Drive(new GyroIONavX(), new ModuleIOSpark(DriveConstants.frontLeftModule),
+                    new ModuleIOSpark(DriveConstants.frontRightModule),
+                    new ModuleIOSpark(DriveConstants.backLeftModule),
+                    new ModuleIOSpark(DriveConstants.backRightModule));
+                roller = new Roller(new RollerIOTalonSRX());
+                var robotState = RobotState.getInstance();
+                vision = new Vision(new VisionIOLimelight(VisionConstants.leftCameraHostname, robotState::getRotation),
+                    new VisionIOLimelight(VisionConstants.rightCameraHostname, robotState::getRotation));
+                break;
 
-      default:
-        // Replayed robot, disable IO implementations
-        drive =
-            new Drive(
-                new GyroIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {},
-                new ModuleIO() {});
-        roller = new Roller(new RollerIO() {});
-        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
-        break;
+            case SIM:
+                // Create a maple-sim swerve drive simulation instance
+                this.driveSimulation = new SwerveDriveSimulation(DriveConstants.mapleSimConfig,
+                    new Pose2d(2, 2, Rotation2d.kZero));
+                // Add the simulated drivetrain to the simulation field
+                SimulatedArena.getInstance().addDriveTrainSimulation(driveSimulation);
+
+                // Sim robot, instantiate physics sim IO implementations
+                drive = new Drive(new GyroIOSim(driveSimulation.getGyroSimulation()),
+                    new ModuleIOSim(driveSimulation.getModules()[0]), new ModuleIOSim(driveSimulation.getModules()[1]),
+                    new ModuleIOSim(driveSimulation.getModules()[2]), new ModuleIOSim(driveSimulation.getModules()[3]));
+
+                roller = new Roller(new RollerIOSim());
+                vision = new Vision(
+                    new VisionIOPhotonVisionSim(VisionConstants.leftCameraHostname, VisionConstants.leftCameraPos,
+                        driveSimulation::getSimulatedDriveTrainPose),
+                    new VisionIOPhotonVisionSim(VisionConstants.rightCameraHostname, VisionConstants.rightCameraPos,
+                        driveSimulation::getSimulatedDriveTrainPose));
+                break;
+
+            default:
+                // Replayed robot, disable IO implementations
+                drive = new Drive(new GyroIO() {
+                }, new ModuleIO() {
+                }, new ModuleIO() {
+                }, new ModuleIO() {
+                }, new ModuleIO() {
+                });
+                roller = new Roller(new RollerIO() {
+                });
+                vision = new Vision(new VisionIO() {
+                }, new VisionIO() {
+                });
+                break;
+        }
+
+        // Set up auto routines
+        NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(1.5));
+        autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
+
+        DriveTuningCommands.addTuningCommandsToAutoChooser(drive, autoChooser);
+        VisionTuningCommands.addTuningCommandsToAutoChooser(vision, autoChooser);
+
+        // Configure the button bindings
+        configureButtonBindings();
     }
 
-    // Set up auto routines
-    NamedCommands.registerCommand("Score", roller.runPercent(1.0).withTimeout(1.5));
-    autoChooser =
-        new LoggedDashboardChooser<>(
-            "Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
+    /**
+     * Use this method to define your button->command mappings. Buttons can be created by instantiating a
+     * {@link GenericHID} or one of its subclasses ({@link edu.wpi.first.wpilibj.Joystick} or {@link XboxController}),
+     * and then passing it to a {@link edu.wpi.first.wpilibj2.command.button.JoystickButton}.
+     */
+    private void configureButtonBindings() {
+        // Default drive command, normal arcade drive
+        drive.setDefaultCommand(DriveCommands.joystickDrive(drive, () -> -driveController.getLeftY(),
+            () -> -driveController.getLeftX(), () -> -driveController.getRightX()));
 
-    if (Constants.tuningMode) {
-      // Set up SysId routines
-      autoChooser.addOption(
-          "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
-      autoChooser.addOption(
-          "Drive SysId (Quasistatic Forward)",
-          drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-      autoChooser.addOption(
-          "Drive SysId (Quasistatic Reverse)",
-          drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-      autoChooser.addOption(
-          "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
-      autoChooser.addOption(
-          "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
-    }
-    // Configure the button bindings
-    configureButtonBindings();
-  }
-
-  /**
-   * Use this method to define your button->command mappings. Buttons can be created by
-   * instantiating a {@link GenericHID} or one of its subclasses ({@link
-   * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing it to a {@link
-   * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
-   */
-  private void configureButtonBindings() {
-    // Default drive command, normal arcade drive
-    drive.setDefaultCommand(
-        DriveCommands.joystickDrive(
-            drive,
-            () -> -driveController.getLeftY(),
-            () -> -driveController.getLeftX(),
-            () -> -driveController.getRightX()));
-
-    // Default roller command, control with triggers
-    roller.setDefaultCommand(
-        roller.runTeleop(
-            () -> opperatorController.getRightTriggerAxis(),
+        // Default roller command, control with triggers
+        roller.setDefaultCommand(roller.runTeleop(() -> opperatorController.getRightTriggerAxis(),
             () -> opperatorController.getLeftTriggerAxis()));
 
-    opperatorController.a().whileTrue(roller.runPercent(1.0));
+        opperatorController.a().whileTrue(roller.runPercent(1.0));
 
-    driveController
-        .start()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  if (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
-                    drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.kZero));
-                  } else {
-                    drive.setPose(new Pose2d(drive.getPose().getTranslation(), Rotation2d.k180deg));
-                  }
-                }));
+        driveController.start().onTrue(Commands.runOnce(() -> {
+            var robotState = RobotState.getInstance();
+            if(DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
+                drive.setPose(new Pose2d(robotState.getPose().getTranslation(), Rotation2d.kZero));
+            } else {
+                drive.setPose(new Pose2d(robotState.getPose().getTranslation(), Rotation2d.k180deg));
+            }
+        }));
 
-    final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
+        final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
 
-    // In configureBindings()
+        // In configureBindings()
 
-    driveController
-        .b()
-        .onTrue(
-            Commands.runOnce(
-                () -> {
-                  Command cmd =
-                      Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
-                  currentPathfindCommand.set(cmd);
-                  cmd.schedule();
-                }))
-        .onFalse(
-            Commands.runOnce(
-                () -> {
-                  Command cmd = currentPathfindCommand.getAndSet(null);
-                  if (cmd != null) {
-                    cmd.cancel();
-                  }
-                }));
-    /*
-     * driveController
-     * .leftBumper()
-     * .onTrue(
-     * Commands.runOnce(
-     * () -> {
-     * Command cmd =
-     * Commands.defer(
-     * () -> DriveCommands.PathfindtoPlayerStation(drive, true), Set.of(drive));
-     * currentPathfindCommand.set(cmd);
-     * cmd.schedule();
-     * }))
-     * .onFalse(
-     * Commands.runOnce(
-     * () -> {
-     * Command cmd = currentPathfindCommand.getAndSet(null);
-     * if (cmd != null) {
-     * cmd.cancel();
-     * }
-     * }));
-     * driveController
-     * .rightBumper()
-     * .onTrue(
-     * Commands.runOnce(
-     * () -> {
-     * Command cmd =
-     * Commands.defer(
-     * () -> DriveCommands.PathfindtoPlayerStation(drive, false), Set.of(drive));
-     * currentPathfindCommand.set(cmd);
-     * cmd.schedule();
-     * }))
-     * .onFalse(
-     * Commands.runOnce(
-     * () -> {
-     * Command cmd = currentPathfindCommand.getAndSet(null);
-     * if (cmd != null) {
-     * cmd.cancel();
-     * }
-     * }));
+        driveController.b().onTrue(Commands.runOnce(() -> {
+            Command cmd = Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
+            currentPathfindCommand.set(cmd);
+            cmd.schedule();
+        })).onFalse(Commands.runOnce(() -> {
+            Command cmd = currentPathfindCommand.getAndSet(null);
+            if(cmd != null) {
+                cmd.cancel();
+            }
+        }));
+
+        // Reset gyro or odometry if in simulation
+        final Runnable resetGyro = Constants.isSim ? () -> drive.setPose(driveSimulation.getSimulatedDriveTrainPose()) // Reset odometry to actual robot pose during simulation
+            : () -> drive.setPose(new Pose2d(RobotState.getInstance().getPose().getTranslation(),
+                DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue ? Rotation2d.kZero
+                    : Rotation2d.k180deg)); // Zero gyro
+        final Runnable resetOdometry = Constants.isSim
+            ? () -> drive.setPose(driveSimulation.getSimulatedDriveTrainPose()) // Reset odometry to actual robot pose during simulation
+            : () -> drive.setPose(
+                new Pose2d(0, 0, DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue ? Rotation2d.kZero
+                    : Rotation2d.k180deg)); // Zero gyro
+
+        driveController.start().onTrue(Commands.runOnce(resetGyro, drive).ignoringDisable(true));
+        driveController.start().and(driveController.leftStick()).debounce(0.5)
+            .onTrue(Commands.runOnce(resetOdometry, drive).ignoringDisable(true));
+        // Used to account for swerve belts slipping.
+        driveController.back().whileTrue(Commands.run(drive::resetToAbsolute));
+    }
+
+    /**
+     * Use this to pass the autonomous command to the main {@link Robot} class.
+     *
+     * @return the command to run in autonomous
      */
-  }
+    public Command getAutonomousCommand() {
+        return autoChooser.get();
+    }
 
-  /**
-   * Use this to pass the autonomous command to the main {@link Robot} class.
-   *
-   * @return the command to run in autonomous
-   */
-  public Command getAutonomousCommand() {
-    return autoChooser.get();
-  }
+    public void resetSimulationField() {
+        if(Constants.currentMode != Constants.Mode.SIM) return;
+
+        SimulatedArena.getInstance().resetFieldForAuto();
+    }
+
+    public void resetSimulatedRobot() {
+        if(Constants.currentMode != Constants.Mode.SIM) return;
+
+        driveSimulation.setSimulationWorldPose(new Pose2d(3, 3, Rotation2d.kZero));
+    }
+
+    public void updateSimulation() {
+        if(Constants.currentMode != Constants.Mode.SIM) return;
+
+        SimulatedArena.getInstance().simulationPeriodic();
+        Logger.recordOutput("FieldSimulation/RobotPosition", driveSimulation.getSimulatedDriveTrainPose());
+        Logger.recordOutput("FieldSimulation/Coral", SimulatedArena.getInstance().getGamePiecesArrayByType("Coral"));
+        Logger.recordOutput("FieldSimulation/Algae", SimulatedArena.getInstance().getGamePiecesArrayByType("Algae"));
+
+        // if(!VisionConstants.enableVisionSimulation) {
+        //     RobotState.getInstance().addVisionMeasurement(driveSimulation.getSimulatedDriveTrainPose(),
+        //         Timer.getTimestamp(), VecBuilder.fill(0, 0, 0));
+        // }
+    }
 }
