@@ -76,7 +76,7 @@ public class Controls {
 
         final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
         driver.b().onTrue(Commands.runOnce(() -> {
-            Command cmd = Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
+            Command cmd = Commands.defer(() -> DriveCommands.pathfindToActiveBranch(drive), Set.of(drive));
             currentPathfindCommand.set(cmd);
             cmd.schedule();
         })).onFalse(Commands.runOnce(() -> {

@@ -27,7 +27,7 @@ public class DriveConstants {
     }
 
     public static final double odometryFrequency = 100.0; // Hz
-    public static final double bumperSizeMeters = Units.inchesToMeters(37.625);
+    public static final double bumperSizeMeters = Units.inchesToMeters(29.5);
     public static final double trackWidth = Units.inchesToMeters(24. - 6.5);
     public static final double wheelBase = Units.inchesToMeters(22. - 6.5);
     public static final double driveBaseRadius = Math.hypot(trackWidth / 2.0, wheelBase / 2.0);
@@ -55,7 +55,7 @@ public class DriveConstants {
     public static final boolean USE_SETPOINT_GENERATOR = false;
 
     // Drive motor configuration
-    public static final int driveMotorCurrentLimit = 35;
+    public static final int driveMotorCurrentLimit = 30;
     public static final double wheelRadiusMeters = Units.inchesToMeters(1.962); // "Magic" number from wheel radius characterization
     public static final double driveMotorReduction = Mk4Reductions.L2.reduction;
     public static final DCMotor driveSimMotor = DCMotor.getNeoVortex(1);
@@ -138,9 +138,9 @@ public class DriveConstants {
     public static final DriveTrainSimulationConfig mapleSimConfig = DriveTrainSimulationConfig.Default()
         .withCustomModuleTranslations(moduleTranslations).withRobotMass(Kilogram.of(robotMassKg))
         .withBumperSize(Meters.of(bumperSizeMeters), Meters.of(bumperSizeMeters)).withGyro(COTS.ofNav2X())
-        .withSwerveModule(
-            new SwerveModuleSimulationConfig(driveSimMotor, turnSimMotor, driveMotorReduction, turnMotorReduction,
-                Volts.of(0.1), Volts.of(0.1), Meters.of(wheelRadiusMeters), KilogramSquareMeters.of(0.02), wheelCOF));
+        .withSwerveModule(new SwerveModuleSimulationConfig(driveSimMotor, turnSimMotor, driveMotorReduction,
+            turnMotorReduction, Volts.of(0.1), Volts.of(0.1), Meters.of(wheelRadiusMeters),
+            KilogramSquareMeters.of(robotMOIKgSqM), wheelCOF));
 
     private enum Mk4Reductions {
         // @formatter:off

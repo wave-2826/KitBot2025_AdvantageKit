@@ -5,6 +5,7 @@ import static edu.wpi.first.units.Units.Meters;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
@@ -19,11 +20,12 @@ import frc.robot.FieldConstants;
 import frc.robot.RobotState;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.DriveConstants;
+import frc.robot.util.Container;
 import frc.robot.util.DriverStationInterface;
-import frc.robot.util.Elastic;
 import frc.robot.util.LoggedTunableNumber;
 import frc.robot.util.ReefTarget;
 import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 
 public class DriveCommands {
     private static final double DEADBAND = 0.1;
@@ -73,12 +75,12 @@ public class DriveCommands {
     }
 
     private static final LoggedTunableNumber lineupDistance = new LoggedTunableNumber("AutoScore/ReefLineupDistance",
-        5);
+        16.);
 
     private static final LoggedTunableNumber centerDistanceTweak = new LoggedTunableNumber( //
         "AutoScore/CenterDistanceTweak", 0.0);
     private static final LoggedTunableNumber centerDistanceTweakRight = new LoggedTunableNumber( //
-        "AutoScore/CenterPositionTweakRight", -0.25);
+        "AutoScore/CenterPositionTweakRight", 0.0);
 
     public static Pose2d getLineupPose(ReefTarget target) {
         return getLineupPose(target, 0.);
@@ -100,20 +102,62 @@ public class DriveCommands {
         return fieldPose;
     }
 
-    public static Command PathfindtoBranch(Drive drive) {
-        DriverStationInterface.getInstance().setReefTarget(
-            new ReefTarget(DriverStationInterface.getInstance().getReefTarget().branch(), FieldConstants.ReefLevel.L1));
-        Pose2d targetPose = getLineupPose(
-            new ReefTarget(DriverStationInterface.getInstance().getReefTarget().branch(), FieldConstants.ReefLevel.L1));
+    /** Returns a command that drives straight at the specified speed. Positive numbers are forward. */
+    public static Command driveStraightCommand(Drive drive, double speedMetersPerSecond,
+        Supplier<Rotation2d> fieldAngle, Supplier<Rotation2d> robotAngle) {
+        Container<Rotation2d> fieldAngleTarget = new Container<>(Rotation2d.kZero);
 
-        Elastic.sendNotification(new Elastic.Notification(Elastic.Notification.NotificationLevel.INFO, "Target Pose",
-            targetPose.toString()));
+        var robotState = RobotState.getInstance();
+        try(PIDController thetaController = new PIDController(6.5, 0.0, 0.3)) {
+            thetaController.enableContinuousInput(0, Math.PI * 2);
+            return Commands.sequence(Commands.runOnce(() -> {
+                thetaController.reset();
+                fieldAngleTarget.value = fieldAngle.get();
+                if(robotAngle != null) thetaController.setSetpoint(robotAngle.get().getRadians());
+            }), Commands.run(() -> {
+                double thetaSpeed = robotAngle == null ? 0.
+                    : thetaController.calculate(robotState.getRotation().getRadians());
+
+                drive.runVelocity(
+                    ChassisSpeeds.fromFieldRelativeSpeeds(fieldAngleTarget.value.getCos() * speedMetersPerSecond,
+                        fieldAngleTarget.value.getSin() * speedMetersPerSecond, thetaSpeed, robotState.getRotation()));
+            }, drive)).withName("DriveStraight").finallyDo(drive::stop);
+        }
+    }
+
+    /**
+     * Returns a command that drives straight at the specified speed until stopped. Positive numbers are forward.
+     */
+    public static Command driveStraightCommand(Drive drive, double speedMetersPerSecond,
+        Supplier<Rotation2d> robotAngle) {
+        return driveStraightCommand(drive, speedMetersPerSecond, RobotState.getInstance()::getRotation, robotAngle);
+    }
+
+    /**
+     * Returns a command that drives straight at the specified speed for the specified duration. Positive numbers are
+     * forward.
+     */
+    public static Command driveStraightCommand(Drive drive, double speedMetersPerSecond, double timeSeconds,
+        Supplier<Rotation2d> robotAngle) {
+        return driveStraightCommand(drive, speedMetersPerSecond, RobotState.getInstance()::getRotation, robotAngle)
+            .withTimeout(timeSeconds);
+    }
+
+    /**
+     * Returns a command that drives at the specified speed and angle for the specified duration. Positive numbers are
+     * forward.
+     */
+    public static Command driveStraightCommand(Drive drive, double speedMetersPerSecond, double timeSeconds,
+        Supplier<Rotation2d> fieldAngle, Supplier<Rotation2d> robotAngle) {
+        return driveStraightCommand(drive, speedMetersPerSecond, fieldAngle, robotAngle).withTimeout(timeSeconds);
+    }
+
+    public static Command pathfindToActiveBranch(Drive drive) {
+        Pose2d targetPose = getLineupPose(DriverStationInterface.getInstance().getReefTarget());
 
         PathConstraints constraints = new PathConstraints(DriveConstants.maxSpeedMetersPerSec, 6.9,
-            (DriveConstants.maxSpeedMetersPerSec / 2.0), 1446);
+            Units.degreesToRadians(480), Units.degreesToRadians(960));
 
-        Command pathfindingCommand = AutoBuilder.pathfindToPose(targetPose, constraints, 0);
-
-        return Commands.sequence(pathfindingCommand);
+        return AutoBuilder.pathfindToPose(targetPose, constraints, 0);
     }
 }

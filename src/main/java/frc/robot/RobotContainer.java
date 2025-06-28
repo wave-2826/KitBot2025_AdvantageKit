@@ -4,10 +4,13 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import frc.robot.commands.DriveCommands;
 import frc.robot.commands.drive.DriveTuningCommands;
 import frc.robot.commands.vision.VisionTuningCommands;
 import frc.robot.subsystems.drive.Drive;
@@ -110,6 +113,14 @@ public class RobotContainer {
         NamedCommands.registerCommand("Score", roller.runPercent(0.5).withTimeout(1.5));
 
         autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
+
+        double distanceInches = 90 - 3 - 5;
+        double timeSeconds = 2.5;
+        autoChooser.addOption("wtf is pathplanner doing",
+            Commands.sequence(
+                DriveCommands.driveStraightCommand(drive, Units.inchesToMeters(distanceInches / timeSeconds),
+                    RobotState.getInstance()::getRotation).withTimeout(timeSeconds),
+                roller.runPercent(0.5).withTimeout(1.5)));
 
         DriveTuningCommands.addTuningCommandsToAutoChooser(drive, autoChooser);
         VisionTuningCommands.addTuningCommandsToAutoChooser(vision, autoChooser);
