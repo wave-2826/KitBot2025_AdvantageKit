@@ -3,6 +3,9 @@ package frc.robot;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import frc.robot.util.RioAlerts;
+import frc.robot.util.SparkUtil;
+
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -87,6 +90,14 @@ public class Robot extends LoggedRobot {
         // This must be called from the robot's periodic block in order for anything in
         // the Command-based framework to work.
         CommandScheduler.getInstance().run();
+
+        // Alert-related updates
+        RioAlerts.getInstance().update();
+        Controls.getInstance().update();
+        SparkUtil.updateSparkFaultAlerts();
+        // robotContainer.updateAlerts();
+
+        RobotState.getInstance().update();
 
         // Return to non-RT thread priority (do not modify the first argument)
         // Threads.setCurrentThreadPriority(false, 10);

@@ -5,14 +5,10 @@ import com.pathplanner.lib.auto.NamedCommands;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj.GenericHID;
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import frc.robot.commands.DriveCommands;
 import frc.robot.commands.drive.DriveTuningCommands;
 import frc.robot.commands.vision.VisionTuningCommands;
 import frc.robot.subsystems.drive.Drive;
@@ -32,9 +28,6 @@ import frc.robot.subsystems.vision.VisionConstants;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.ironmaple.simulation.SimulatedArena;
 import org.ironmaple.simulation.drivesims.SwerveDriveSimulation;
 import org.littletonrobotics.junction.Logger;
@@ -54,13 +47,12 @@ public class RobotContainer {
     // Only used in simulation
     private SwerveDriveSimulation driveSimulation = null;
 
-    // Controllers
-    private final CommandXboxController driveController = new CommandXboxController(0);
-    private final CommandXboxController opperatorController = new CommandXboxController(
-        Constants.twoDriverMode ? 1 : 0);
-
     // Dashboard inputs
     private final LoggedDashboardChooser<Command> autoChooser;
+
+    private final Alert logReceiverQueueAlert = new Alert(
+        "Logging queue exceeded capacity; data isn't being logged! This may fix itself.", AlertType.kError);
+    private final Alert noAutoSelectedAlert = new Alert("No auto selected!", AlertType.kWarning);
 
     /**
      * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -123,65 +115,14 @@ public class RobotContainer {
         VisionTuningCommands.addTuningCommandsToAutoChooser(vision, autoChooser);
 
         // Configure the button bindings
-        configureButtonBindings();
+        Controls.getInstance().configureControls(drive, driveSimulation, roller, vision);
     }
 
-    /**
-     * Use this method to define your button->command mappings. Buttons can be created by instantiating a
-     * {@link GenericHID} or one of its subclasses ({@link edu.wpi.first.wpilibj.Joystick} or {@link XboxController}),
-     * and then passing it to a {@link edu.wpi.first.wpilibj2.command.button.JoystickButton}.
-     */
-    private void configureButtonBindings() {
-        // Default drive command, normal arcade drive
-        drive.setDefaultCommand(DriveCommands.joystickDrive(drive, () -> -driveController.getLeftY(),
-            () -> -driveController.getLeftX(), () -> -driveController.getRightX()));
+    public void updateAlerts() {
+        String selected = autoChooser.getSendableChooser().getSelected();
+        noAutoSelectedAlert.set(DriverStation.isDisabled() && (selected == null || selected == "None"));
 
-        // Default roller command, control with triggers
-        roller.setDefaultCommand(roller.runTeleop(() -> opperatorController.getRightTriggerAxis(),
-            () -> opperatorController.getLeftTriggerAxis()));
-
-        opperatorController.a().whileTrue(roller.runPercent(1.0));
-
-        driveController.start().onTrue(Commands.runOnce(() -> {
-            var robotState = RobotState.getInstance();
-            if(DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
-                drive.setPose(new Pose2d(robotState.getPose().getTranslation(), Rotation2d.kZero));
-            } else {
-                drive.setPose(new Pose2d(robotState.getPose().getTranslation(), Rotation2d.k180deg));
-            }
-        }));
-
-        final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
-
-        // In configureBindings()
-
-        driveController.b().onTrue(Commands.runOnce(() -> {
-            Command cmd = Commands.defer(() -> DriveCommands.PathfindtoBranch(drive), Set.of(drive));
-            currentPathfindCommand.set(cmd);
-            cmd.schedule();
-        })).onFalse(Commands.runOnce(() -> {
-            Command cmd = currentPathfindCommand.getAndSet(null);
-            if(cmd != null) {
-                cmd.cancel();
-            }
-        }));
-
-        // Reset gyro or odometry if in simulation
-        final Runnable resetGyro = Constants.isSim ? () -> drive.setPose(driveSimulation.getSimulatedDriveTrainPose()) // Reset odometry to actual robot pose during simulation
-            : () -> drive.setPose(new Pose2d(RobotState.getInstance().getPose().getTranslation(),
-                DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue ? Rotation2d.kZero
-                    : Rotation2d.k180deg)); // Zero gyro
-        final Runnable resetOdometry = Constants.isSim
-            ? () -> drive.setPose(driveSimulation.getSimulatedDriveTrainPose()) // Reset odometry to actual robot pose during simulation
-            : () -> drive.setPose(
-                new Pose2d(0, 0, DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue ? Rotation2d.kZero
-                    : Rotation2d.k180deg)); // Zero gyro
-
-        driveController.start().onTrue(Commands.runOnce(resetGyro, drive).ignoringDisable(true));
-        driveController.start().and(driveController.leftStick()).debounce(0.5)
-            .onTrue(Commands.runOnce(resetOdometry, drive).ignoringDisable(true));
-        // Used to account for swerve belts slipping.
-        driveController.back().whileTrue(Commands.run(drive::resetToAbsolute));
+        logReceiverQueueAlert.set(Logger.getReceiverQueueFault());
     }
 
     /**

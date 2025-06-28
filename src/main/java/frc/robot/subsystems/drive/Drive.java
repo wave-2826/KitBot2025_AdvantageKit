@@ -9,7 +9,6 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.commands.PathfindingCommand;
 import com.pathplanner.lib.pathfinding.Pathfinding;
 import com.pathplanner.lib.util.DriveFeedforwards;
-import com.pathplanner.lib.util.FlippingUtil;
 import com.pathplanner.lib.util.PathPlannerLogging;
 import com.pathplanner.lib.util.swerve.SwerveSetpoint;
 import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
@@ -20,18 +19,14 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
-import frc.robot.FieldConstants;
 import frc.robot.RobotState;
 import frc.robot.Constants.Mode;
-import frc.robot.commands.drive.DriveCommands;
 import frc.robot.util.LocalADStarAK;
 
 import java.util.Optional;
@@ -107,23 +102,6 @@ public class Drive extends SubsystemBase {
             Logger.recordOutput("Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
         });
         PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
-            // HACK: what is pathplanner doing
-            if(!Constants.isSim) {
-                boolean isRed = DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red;
-                if(DriverStation.isEnabled() && isRed && targetPose.getX() < FieldConstants.fieldLength / 2) {
-                    System.out.println("Stopping auto; PathPlanner is trying to destroy the robot again");
-                    CommandScheduler.getInstance().cancelAll();
-                    DriveCommands.driveStraightCommand(this, Units.feetToMeters(2), 1,
-                        () -> FlippingUtil.flipFieldRotation(Rotation2d.kZero)).schedule();
-                }
-                if(DriverStation.isEnabled() && !isRed && targetPose.getX() > FieldConstants.fieldLength / 2) {
-                    System.out.println("Stopping auto; PathPlanner is trying to destroy the robot again");
-                    CommandScheduler.getInstance().cancelAll();
-                    DriveCommands.driveStraightCommand(this, Units.feetToMeters(2), 1,
-                        () -> FlippingUtil.flipFieldRotation(Rotation2d.kZero)).schedule();
-                }
-            }
-
             Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
         });
 

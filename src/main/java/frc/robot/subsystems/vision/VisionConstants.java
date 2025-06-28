@@ -12,8 +12,8 @@ public class VisionConstants {
         .loadField(AprilTagFields.k2025ReefscapeWelded);
 
     // Camera names, must match names configured on coprocessor
-    public static String leftCameraHostname = "limelight-ps";
-    public static String rightCameraHostname = "limelight-reef";
+    public static String leftCameraHostname = "limelight-left";
+    public static String rightCameraHostname = "limelight-right";
 
     // Robot to camera transforms
     // (Not used by Limelight, configure in web UI instead)

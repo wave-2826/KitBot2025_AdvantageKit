@@ -15,7 +15,7 @@ public final class Constants {
      * Whether to use NetworkTables instead of RLog for AdvantageScope logging. RLog _significantly_ reduces lag in
      * AdvantageScope.
      */
-    public static final boolean useNTLogs = false;
+    public static final boolean useNTLogs = true;
 
     public static final boolean tuningMode = true;
 

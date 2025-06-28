@@ -50,10 +50,10 @@ public class VisionTuningCommands {
 
     /** The transform of the calibration tag, relative to the robot base. */
     public static Transform3d heldTagTransform = new Transform3d(new Translation3d( //
-        Units.inchesToMeters(-3.), // Distance forward
-        Units.inchesToMeters(19.), // Distance left
-        Units.inchesToMeters(23. + 6.5 / 2) // Distance up
-    ), new Rotation3d(0., 0., Units.degreesToRadians(270)));
+        Units.inchesToMeters(16.125 + 11.), // Distance forward
+        Units.inchesToMeters(0.), // Distance left
+        Units.inchesToMeters(8.875) // Distance up
+    ), new Rotation3d(0., 0., Units.degreesToRadians(180)));
 
     public static Pose3d heldTagPose = VisionConstants.aprilTagLayout.getTagPose(10).get();
 
