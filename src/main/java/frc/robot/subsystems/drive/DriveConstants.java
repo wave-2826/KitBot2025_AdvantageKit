@@ -55,7 +55,7 @@ public class DriveConstants {
     public static final boolean USE_SETPOINT_GENERATOR = false;
 
     // Drive motor configuration
-    public static final int driveMotorCurrentLimit = 70;
+    public static final int driveMotorCurrentLimit = 45;
     public static final double wheelRadiusMeters = Units.inchesToMeters(1.962); // "Magic" number from wheel radius characterization
     public static final double driveMotorReduction = Mk4Reductions.L2.reduction;
     public static final DCMotor driveSimMotor = DCMotor.getNeoVortex(1);
@@ -83,7 +83,7 @@ public class DriveConstants {
 
     // Turn motor configuration
     public static final boolean turnInverted = false;
-    public static final int turnMotorCurrentLimit = 35;
+    public static final int turnMotorCurrentLimit = 30;
     public static final double turnMotorReduction = Mk4Reductions.Turn.reduction;
     public static final DCMotor turnSimMotor = DCMotor.getNeoVortex(1);
     public static final AngularVelocity maxSteerVelocity = RadiansPerSecond.of(100);

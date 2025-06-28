@@ -125,8 +125,9 @@ public class Vision extends SubsystemBase {
                 }
 
                 // Send vision observation
-                robotState.addVisionMeasurement(observation.pose().toPose2d(), observation.timestamp(),
-                    VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
+                // TODO: Calibrate cameras
+                // robotState.addVisionMeasurement(observation.pose().toPose2d(), observation.timestamp(),
+                //     VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
             }
             // Log camera data
             Logger.recordOutput("Vision/Camera" + Integer.toString(cameraIndex) + "/TagPoses",
