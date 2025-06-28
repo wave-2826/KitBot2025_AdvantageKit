@@ -114,8 +114,8 @@ public class RobotContainer {
 
         autoChooser = new LoggedDashboardChooser<>("Auto Choices", AutoBuilder.buildAutoChooser("Center 1 Coral"));
 
-        double distanceInches = 90 - 3 - 5;
-        double timeSeconds = 2.5;
+        double distanceInches = 90 - 3 - 1;
+        double timeSeconds = 2.0;
         autoChooser.addOption("wtf is pathplanner doing",
             Commands.sequence(
                 DriveCommands.driveStraightCommand(drive, Units.inchesToMeters(distanceInches / timeSeconds),
