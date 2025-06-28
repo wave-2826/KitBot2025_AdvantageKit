@@ -4,7 +4,7 @@ import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Transform3d;
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.math.geometry.Translation3d;
 
 public class VisionConstants {
     // AprilTag layout
@@ -18,13 +18,18 @@ public class VisionConstants {
     // Robot to camera transforms
     // (Not used by Limelight, configure in web UI instead)
     // Using limelights but for sim we are emulating PhotonVision
-    public static Transform3d leftCameraPos = new Transform3d(Units.inchesToMeters(11.1),
-        Units.inchesToMeters(11.459224), Units.inchesToMeters(32.398761),
-        new Rotation3d(Math.toRadians(0), Math.toRadians(-30), Math.toRadians(180)));
+    public static Transform3d leftCameraPos = new Transform3d(
+        new Translation3d(0.23840027576590855, 0.21439095933876529, 0.34860957146726285),
+        new Rotation3d(-0.04998098341920379, 1.0067494270931172, -0.8353690259370719));
 
-    public static Transform3d rightCameraPos = new Transform3d(Units.inchesToMeters(-5),
-        Units.inchesToMeters(-14.143929), Units.inchesToMeters(14.175),
-        new Rotation3d(Math.toRadians(0), Math.toRadians(0), Math.toRadians(0)));
+    public static Transform3d rightCameraPos = new Transform3d(
+        new Translation3d(0.24873265280001045, -0.21439095933876529, 0.3606904011261275),
+        new Rotation3d(0.02239841926409702, 0.04025359873626376, 0.8218679633240364));
+
+    // Robot to camera 0: `new Transform3d(new Translation3d(0.23840027576590855, 0.20139212949869617, 0.34860957146726285), new Rotation3d(-0.04998098341920379, 1.0067494270931172, -0.8353690259370719))`
+    // Robot to camera 1: `new Transform3d(new Translation3d(0.24873265280001045, -0.22738978917883443, 0.3606904011261275), new Rotation3d(0.02239841926409702, 0.04025359873626376, 0.8218679633240364))`
+    // Robot to front left camera (centered Y compensated): `new Transform3d(new Translation3d(0.23840027576590855, 0.21439095933876529, 0.34860957146726285), new Rotation3d(-0.04998098341920379, 1.0067494270931172, -0.8353690259370719))`
+    // Robot to front right camera (centered Y compensated): `new Transform3d(new Translation3d(0.24873265280001045, -0.21439095933876529, 0.3606904011261275), new Rotation3d(0.02239841926409702, 0.04025359873626376, 0.8218679633240364))`
 
     // Basic filtering thresholds
     public static double maxAmbiguity = 0.3;
