@@ -1,10 +1,16 @@
 package frc.robot;
 
 import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.util.RioAlerts;
 import frc.robot.util.SparkUtil;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
@@ -14,6 +20,8 @@ import org.littletonrobotics.junction.rlog.RLOGServer;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 import org.littletonrobotics.urcl.URCL;
+
+import com.ctre.phoenix6.SignalLogger;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to each mode, as
@@ -71,6 +79,38 @@ public class Robot extends LoggedRobot {
 
         // Start AdvantageKit logger
         Logger.start();
+
+        // Disable automatic Hoot logging
+        SignalLogger.enableAutoLogging(false);
+
+        DriverStation.silenceJoystickConnectionWarning(true);
+
+        // Log active commands. Also taken from 6328's code.
+        Map<String, Integer> commandCounts = new HashMap<>();
+        BiConsumer<Command, Boolean> logCommandFunction = (Command command, Boolean active) -> {
+            String name = command.getName();
+            int count = commandCounts.getOrDefault(name, 0) + (active ? 1 : -1);
+            commandCounts.put(name, count);
+            // We currently don't log unique commands unless we're in replay since it isn't
+            // very helpful and adds a lot of noise to the logs.
+            if(Constants.currentMode == Constants.Mode.REPLAY) {
+                Logger.recordOutput("CommandsUnique/" + name + "_" + Integer.toHexString(command.hashCode()), active);
+            }
+
+            Logger.recordOutput("CommandsAll/" + name, count > 0);
+        };
+        CommandScheduler.getInstance()
+            .onCommandInitialize((Command command) -> logCommandFunction.accept(command, true));
+        CommandScheduler.getInstance().onCommandFinish((Command command) -> logCommandFunction.accept(command, false));
+        CommandScheduler.getInstance()
+            .onCommandInterrupt((Command command) -> logCommandFunction.accept(command, false));
+
+        // This most likely isn't a good idea, but we experience so many power issues
+        // that we reduce the RoboRIO brownout voltage. The RoboRIO 2 originally had a
+        // brownout voltage of 6.25 before it was increased, so we're comfortable
+        // setting it to 6.0. This hasn't caused issues in the past, but it's obviously
+        // not an ideal solution.
+        RobotController.setBrownoutVoltage(6.0);
 
         // Instantiate our RobotContainer. This will perform all our button bindings,
         // and put our autonomous chooser on the dashboard.

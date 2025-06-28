@@ -125,9 +125,8 @@ public class Vision extends SubsystemBase {
                 }
 
                 // Send vision observation
-                // TODO: Calibrate cameras
-                // robotState.addVisionMeasurement(observation.pose().toPose2d(), observation.timestamp(),
-                //     VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
+                robotState.addVisionMeasurement(observation.pose().toPose2d(), observation.timestamp(),
+                    VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
             }
             // Log camera data
             Logger.recordOutput("Vision/Camera" + Integer.toString(cameraIndex) + "/TagPoses",
@@ -163,7 +162,11 @@ public class Vision extends SubsystemBase {
     public Pose3d[] getRobotTransforms() {
         Pose3d[] results = new Pose3d[io.length];
         for(int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
-            results[cameraIndex] = inputs[cameraIndex].poseObservations[0].pose();
+            if(inputs[cameraIndex].poseObservations.length > 0) {
+                results[cameraIndex] = inputs[cameraIndex].poseObservations[0].pose();
+            } else {
+                results[cameraIndex] = null;
+            }
         }
         return results;
     }

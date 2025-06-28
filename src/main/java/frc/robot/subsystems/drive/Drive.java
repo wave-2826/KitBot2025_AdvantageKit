@@ -104,6 +104,9 @@ public class Drive extends SubsystemBase {
         PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
             Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
         });
+        PathPlannerLogging.setLogCurrentPoseCallback((targetPose) -> {
+            Logger.recordOutput("Odometry/CurrentPose", targetPose);
+        });
 
         // Due to how Java works, the first run of pathfinding commands can have significantly higher delay than subsequent runs.
         // This can be partially alleviated by running a warmup command in the background when code starts.

@@ -7,7 +7,7 @@ import edu.wpi.first.wpilibj.RobotBase;
  * the value of "simMode" to switch between "sim" (physics sim) and "replay" (log replay from a file).
  */
 public final class Constants {
-    public static final Mode simMode = Mode.SIM;
+    public static final Mode simMode = Mode.REPLAY;
 
     /** If the robot should log data in simulation. */
     public static final boolean logInSimulation = false;
@@ -15,7 +15,7 @@ public final class Constants {
      * Whether to use NetworkTables instead of RLog for AdvantageScope logging. RLog _significantly_ reduces lag in
      * AdvantageScope.
      */
-    public static final boolean useNTLogs = true;
+    public static final boolean useNTLogs = false;
 
     public static final boolean tuningMode = true;
 
