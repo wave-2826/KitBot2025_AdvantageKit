@@ -7,7 +7,7 @@ import edu.wpi.first.wpilibj.RobotBase;
  * the value of "simMode" to switch between "sim" (physics sim) and "replay" (log replay from a file).
  */
 public final class Constants {
-    public static final Mode simMode = Mode.REPLAY;
+    public static final Mode simMode = Mode.SIM;
 
     /** If the robot should log data in simulation. */
     public static final boolean logInSimulation = false;

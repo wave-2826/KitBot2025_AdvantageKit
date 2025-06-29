@@ -14,7 +14,9 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.robot.Constants;
 import frc.robot.RobotState;
 import frc.robot.Constants.Mode;
@@ -44,12 +46,16 @@ public class Drive extends SubsystemBase {
 
     public SwerveDriveKinematics kinematics = new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
-    /** If the setpoints have been updated this loop. Used to avoid continuing at a speed when we tell it to stop. */
-    private boolean setpointsUpdated = false;
+    /**
+     * If the trajectory following callback was run this tick. Reset at the end of each loop iteration so we know when
+     * to continue pathing to the latest known pose.
+     */
+    private boolean trajectoryUpdatedThisTick = false;
+    /** The latest trajectory target. See trajectoryUpdatedThisTick. If null, no trajectory has been followed yet. */
+    private Pose2d latestTrajectoryTarget = null;
+
     /** If we're currently controlling the robot with velocity. */
     private boolean velocityControlMode = true;
-    /** The latest speed setpoint for velocity control. */
-    private ChassisSpeeds latestSpeedSetpoint = new ChassisSpeeds();
 
     /** A debouncer that automatically unlocks the wheels after the robot has been disabled for a period of time. */
     private final Debouncer unlockWheelsDebouncer = new Debouncer(2.0, Debouncer.DebounceType.kFalling);
@@ -82,6 +88,10 @@ public class Drive extends SubsystemBase {
         SparkOdometryThread.getInstance().start();
 
         thetaController.enableContinuousInput(-Math.PI, Math.PI);
+
+        RobotModeTriggers.autonomous().onTrue(Commands.runOnce(() -> {
+            latestTrajectoryTarget = null;
+        }));
     }
 
     /**
@@ -101,16 +111,10 @@ public class Drive extends SubsystemBase {
      * @param sample Sample along the path to follow
      */
     public void followPath(SwerveSample sample) {
-        var pose = RobotState.getInstance().getPose();
+        trajectoryUpdatedThisTick = true;
+        latestTrajectoryTarget = sample.getPose();
 
-        Logger.recordOutput("Odometry/CurrentPose", pose);
-        Logger.recordOutput("Odometry/TargetPose", sample.getPose());
-
-        var targetSpeeds = sample.getChassisSpeeds();
-        targetSpeeds.vxMetersPerSecond += xController.calculate(pose.getX(), sample.x);
-        targetSpeeds.vyMetersPerSecond += yController.calculate(pose.getY(), sample.y);
-        targetSpeeds.omegaRadiansPerSecond += thetaController.calculate(pose.getRotation().getRadians(),
-            sample.heading);
+        var baseSpeeds = sample.getChassisSpeeds();
 
         double[] accelerations = new double[modules.length];
         for(int i = 0; i < modules.length; i++) {
@@ -119,7 +123,21 @@ public class Drive extends SubsystemBase {
             accelerations[i] = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
         }
 
-        runVelocity(ChassisSpeeds.fromFieldRelativeSpeeds(targetSpeeds, RobotState.getInstance().getRotation()),
+        followPathToTarget(latestTrajectoryTarget, accelerations, baseSpeeds);
+    }
+
+    public void followPathToTarget(Pose2d targetPose, double[] accelerations, ChassisSpeeds baseSpeeds) {
+        var pose = RobotState.getInstance().getPose();
+
+        Logger.recordOutput("Odometry/CurrentPose", pose);
+        Logger.recordOutput("Odometry/TargetPose", targetPose);
+
+        baseSpeeds.vxMetersPerSecond += xController.calculate(pose.getX(), targetPose.getX());
+        baseSpeeds.vyMetersPerSecond += yController.calculate(pose.getY(), targetPose.getY());
+        baseSpeeds.omegaRadiansPerSecond += thetaController.calculate(pose.getRotation().getRadians(),
+            targetPose.getRotation().getRadians());
+
+        runVelocity(ChassisSpeeds.fromFieldRelativeSpeeds(baseSpeeds, RobotState.getInstance().getRotation()),
             accelerations);
     }
 
@@ -140,9 +158,7 @@ public class Drive extends SubsystemBase {
     public void runVelocity(ChassisSpeeds speeds, double[] accelerationsMps2) {
         Logger.recordOutput("SwerveChassisSpeeds/TargetSpeeds", speeds);
 
-        setpointsUpdated = true;
         velocityControlMode = true;
-        latestSpeedSetpoint = speeds;
 
         ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
         SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
@@ -312,13 +328,14 @@ public class Drive extends SubsystemBase {
         // Update gyro alert
         gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
 
-        // Subsystems are updated first, so this adds a bit of latency. Therefore,
-        // we only update when our commands already didn't immediately update.
-        // If they didn't, we manually run velocity control to avoid situations where the robot
-        // continues moving after we tell it to stop.
-        if(!setpointsUpdated && velocityControlMode && DriverStation.isEnabled()) {
-            runVelocity(latestSpeedSetpoint);
+        if(!trajectoryUpdatedThisTick && velocityControlMode && latestTrajectoryTarget != null
+            && DriverStation.isAutonomousEnabled()) {
+            followPathToTarget( //
+                latestTrajectoryTarget, //
+                new double[modules.length], //
+                new ChassisSpeeds(0., 0., 0.) //
+            );
         }
-        setpointsUpdated = false;
+        trajectoryUpdatedThisTick = false;
     }
 }

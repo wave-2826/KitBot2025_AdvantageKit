@@ -49,13 +49,10 @@ public class AutoRoutines {
         routine.active().onTrue(Commands.sequence(
             firstPiece.resetOdometry(),
             firstPiece.cmd(),
-            Commands.runOnce(drive::stop),
             Commands.waitSeconds(2.0),
             secondPiece.cmd(),
-            Commands.runOnce(drive::stop),
             Commands.waitSeconds(2.0),
-            thirdPiece.cmd(),
-            Commands.runOnce(drive::stop)
+            thirdPiece.cmd()
         ));
         // @formatter:on
 
