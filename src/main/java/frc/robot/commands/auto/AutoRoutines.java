@@ -12,8 +12,13 @@ import frc.robot.util.LoggedAutoChooser;
 
 public class AutoRoutines {
     private final AutoFactory autoFactory;
+    private final Drive drive;
+
+    private static final double WAIT_TIME = 1.25;
 
     public AutoRoutines(Drive drive, Roller roller, LoggedAutoChooser autoChooser) {
+        this.drive = drive;
+
         autoFactory = drive.createAutoFactory((traj, isStart) -> {
             Logger.recordOutput("Odometry/Trajectory", traj.getPoses());
             Logger.recordOutput("Odometry/IsStart", isStart);
@@ -36,12 +41,16 @@ public class AutoRoutines {
         routine.active().onTrue(Commands.sequence(
             firstPiece.resetOdometry(),
             firstPiece.cmd(),
-            Commands.waitSeconds(1),
+            Commands.runOnce(drive::stop),
+            Commands.waitSeconds(WAIT_TIME),
             secondPiece.cmd(),
-            Commands.waitSeconds(1),
+            Commands.runOnce(drive::stop),
+            Commands.waitSeconds(WAIT_TIME),
             thirdPiece.cmd(),
-            Commands.waitSeconds(1),
-            fourthPiece.cmd()
+            Commands.runOnce(drive::stop),
+            Commands.waitSeconds(WAIT_TIME),
+            fourthPiece.cmd(),
+            Commands.runOnce(drive::stop)
         ));
         // @formatter:on
 

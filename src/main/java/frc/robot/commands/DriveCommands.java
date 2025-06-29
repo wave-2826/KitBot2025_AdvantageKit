@@ -75,7 +75,7 @@ public class DriveCommands {
     }
 
     private static final LoggedTunableNumber lineupDistance = new LoggedTunableNumber("AutoScore/ReefLineupDistance",
-        16.);
+        15.);
 
     private static final LoggedTunableNumber centerDistanceTweak = new LoggedTunableNumber( //
         "AutoScore/CenterDistanceTweak", 0.0);
