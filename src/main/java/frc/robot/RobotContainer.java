@@ -2,13 +2,10 @@ package frc.robot;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
-import frc.robot.commands.DriveCommands;
 import frc.robot.commands.auto.AutoRoutines;
 import frc.robot.commands.drive.DriveTuningCommands;
 import frc.robot.commands.vision.VisionTuningCommands;
@@ -127,15 +124,6 @@ public class RobotContainer {
         RobotModeTriggers.autonomous().whileTrue(autoChooser.selectedCommandScheduler());
 
         routines = new AutoRoutines(drive, roller, autoChooser);
-
-        double correctionRemoveMeWhenItActuallyWorks = 4;
-        double distanceInches = 90 - 3 - 1 + correctionRemoveMeWhenItActuallyWorks;
-        double timeSeconds = 2.0;
-        autoChooser.addCmd("wtf is (choreo) doing",
-            () -> Commands.sequence(
-                DriveCommands.driveStraightCommand(drive, Units.inchesToMeters(distanceInches / timeSeconds),
-                    RobotState.getInstance()::getRotation).withTimeout(timeSeconds),
-                roller.runPercent(0.5).withTimeout(1.5)));
 
         DriveTuningCommands.addTuningCommandsToAutoChooser(drive, autoChooser);
         VisionTuningCommands.addTuningCommandsToAutoChooser(vision, autoChooser);

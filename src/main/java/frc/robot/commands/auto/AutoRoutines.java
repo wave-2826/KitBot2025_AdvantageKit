@@ -25,6 +25,16 @@ public class AutoRoutines {
         autoFactory.bind("Eject", roller.runPercent(0.5).withTimeout(1));
 
         autoChooser.addRoutine("4-piece L1", this::get4Piece);
+
+        autoChooser.addRoutine("Center 1-piece", this::getCenter1Piece);
+
+        // double correctionRemoveMeWhenItActuallyWorks = 4;
+        // double distanceInches = 90 - 3 - 1 + correctionRemoveMeWhenItActuallyWorks;
+        // double timeSeconds = 1.5;
+        // autoChooser.addCmd("1-piece center", () -> Commands.sequence(
+        //     DriveCommands.driveStraightCommand(drive, Units.inchesToMeters(distanceInches / timeSeconds),
+        //         RobotState.getInstance()::getRotation).withTimeout(timeSeconds),
+        //     roller.runPercent(0.5).withTimeout(1.5)));
     }
 
     private AutoRoutine get4Piece() {
@@ -46,9 +56,22 @@ public class AutoRoutines {
             Commands.waitSeconds(2.0),
             thirdPiece.cmd(),
             Commands.runOnce(drive::stop)
-            // Commands.waitSeconds(1.0),
-            // fourthPiece.cmd(),
-            // Commands.runOnce(drive::stop)
+        ));
+        // @formatter:on
+
+        return routine;
+    }
+
+    private AutoRoutine getCenter1Piece() {
+        var routine = autoFactory.newRoutine("Center 1-piece");
+
+        AutoTrajectory firstPiece = routine.trajectory("Center 1-piece", 0);
+
+        // @formatter:off
+        routine.active().onTrue(Commands.sequence(
+            firstPiece.resetOdometry(),
+            firstPiece.cmd(),
+            Commands.runOnce(drive::stop)
         ));
         // @formatter:on
 
