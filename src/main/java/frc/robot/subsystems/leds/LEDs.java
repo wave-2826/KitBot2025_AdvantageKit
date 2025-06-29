@@ -39,7 +39,7 @@ public class LEDs extends SubsystemBase {
     /** The WAVE Blue color. */
     private static final Color WAVE_BLUE = new Color("#00A0C3");
     /** The WAVE Green color. */
-    private static final Color WAVE_GREEN = new Color("#45bf4d");
+    private static final Color WAVE_GREEN = new Color("#45fe7d");
 
     /** The maximum speed multiplier for when the robot is going its maximum speed. */
     private static final double maximumSpeedMultiplier = 2.5;
@@ -334,7 +334,7 @@ public class LEDs extends SubsystemBase {
 
     private void waveStripes() {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
-            double fade = (time * 40 + i * 5) % 255;
+            double fade = (time * 80 + i * 5) % 256;
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - fade * 2) / 255));
             } else {
@@ -354,7 +354,7 @@ public class LEDs extends SubsystemBase {
 
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             // Twinkle effect with random offsets
-            int twinkle = ((int) (time * 20 / 4) + twinkleOffsets[i]) % 256;
+            int twinkle = ((int) (time * 80 / 4) + twinkleOffsets[i]) % 256;
             if(twinkle < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - twinkle * 2) / 255));
             } else {
@@ -365,7 +365,7 @@ public class LEDs extends SubsystemBase {
 
     private void allianceStripes() {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
-            double fade = (time * 40 + i * 5) % 255;
+            double fade = (time * 80 + i * 5) % 256;
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(Color.kBlue, Color.kBlack, (255 - fade * 2) / 255));
             } else {
