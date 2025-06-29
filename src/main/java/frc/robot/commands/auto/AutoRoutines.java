@@ -22,7 +22,7 @@ public class AutoRoutines {
             Logger.recordOutput("Odometry/IsStart", isStart);
         });
 
-        autoFactory.bind("Eject", roller.runPercent(0.4).withTimeout(1));
+        autoFactory.bind("Eject", roller.runPercent(0.5).withTimeout(1));
 
         autoChooser.addRoutine("4-piece L1", this::get4Piece);
     }
@@ -39,19 +39,15 @@ public class AutoRoutines {
         routine.active().onTrue(Commands.sequence(
             firstPiece.resetOdometry(),
             firstPiece.cmd(),
-            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(0.75),
+            Commands.waitSeconds(1.0),
             secondPiece.cmd(),
-            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(0.75),
+            Commands.waitSeconds(1.0),
             thirdPiece.cmd(),
-            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(0.75),
+            Commands.waitSeconds(1.0),
             fourthPiece.cmd(),
-            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop)
         ));
         // @formatter:on
