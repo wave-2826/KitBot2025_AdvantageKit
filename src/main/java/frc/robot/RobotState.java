@@ -35,9 +35,7 @@ public class RobotState {
     }
 
     public static boolean shouldFlip() {
-        return DriverStation.getAlliance()
-            .orElseThrow(() -> new RuntimeException("Flip check was called with an unknown alliance"))
-            .equals(Alliance.Red);
+        return DriverStation.getAlliance().orElse(Alliance.Blue).equals(Alliance.Red);
     }
 
     private RobotState() {
