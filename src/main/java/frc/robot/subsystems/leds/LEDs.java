@@ -117,8 +117,8 @@ public class LEDs extends SubsystemBase {
 
         AutonomousStart(LEDs::autonomousStart, LEDCompositingMode.Additive), // Active at the start of autonomous
 
-        Rainbow((leds) -> leds.rainbow()), //
-        LightRainbow((leds) -> leds.rainbow(0.5, 0.5)), //
+        Rainbow((leds) -> leds.rainbow(1.0, 0.5)), //
+        LightRainbow((leds) -> leds.rainbow(0.5, 0.4)), //
         WaveStripes((leds) -> leds.waveStripes()), //
         WaveTwinkle((leds) -> leds.waveTwinkle()), //
         AllianceStripes((leds) -> leds.allianceStripes()), //
@@ -334,7 +334,7 @@ public class LEDs extends SubsystemBase {
 
     private void waveStripes() {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
-            double fade = (time * 80 + i * 5) % 256;
+            double fade = (time * 150 + 10 + i * 5) % 256;
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - fade * 2) / 255));
             } else {
@@ -354,7 +354,7 @@ public class LEDs extends SubsystemBase {
 
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             // Twinkle effect with random offsets
-            int twinkle = ((int) (time * 80 / 4) + twinkleOffsets[i]) % 256;
+            int twinkle = ((int) (time * 70 + 20) + (int) twinkleOffsets[i]) % 256;
             if(twinkle < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - twinkle * 2) / 255));
             } else {
@@ -365,7 +365,7 @@ public class LEDs extends SubsystemBase {
 
     private void allianceStripes() {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
-            double fade = (time * 80 + i * 5) % 256;
+            double fade = (time * 205 + 55 + i * 5) % 256;
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(Color.kBlue, Color.kBlack, (255 - fade * 2) / 255));
             } else {
