@@ -56,8 +56,8 @@ public class Drive extends SubsystemBase {
     /** If the wheels are currently in brake mode. */
     private boolean wheelsLocked = true;
 
-    private final PIDController xController = new PIDController(6.75, 0.0, 0.0);
-    private final PIDController yController = new PIDController(6.75, 0.0, 0.0);
+    private final PIDController xController = new PIDController(9.0, 0.0, 0.0);
+    private final PIDController yController = new PIDController(9.0, 0.0, 0.0);
     private final PIDController thetaController = new PIDController(8.0, 1.5, 1.25);
 
     /**

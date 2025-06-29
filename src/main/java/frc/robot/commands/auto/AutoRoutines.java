@@ -14,8 +14,6 @@ public class AutoRoutines {
     private final AutoFactory autoFactory;
     private final Drive drive;
 
-    private static final double WAIT_TIME = 1.25;
-
     public AutoRoutines(Drive drive, Roller roller, LoggedAutoChooser autoChooser) {
         this.drive = drive;
 
@@ -41,15 +39,19 @@ public class AutoRoutines {
         routine.active().onTrue(Commands.sequence(
             firstPiece.resetOdometry(),
             firstPiece.cmd(),
+            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(WAIT_TIME),
+            Commands.waitSeconds(0.75),
             secondPiece.cmd(),
+            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(WAIT_TIME),
+            Commands.waitSeconds(0.75),
             thirdPiece.cmd(),
+            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(WAIT_TIME),
+            Commands.waitSeconds(0.75),
             fourthPiece.cmd(),
+            Commands.waitSeconds(0.25),
             Commands.runOnce(drive::stop)
         ));
         // @formatter:on
