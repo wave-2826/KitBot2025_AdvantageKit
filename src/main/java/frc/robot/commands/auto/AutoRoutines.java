@@ -33,22 +33,22 @@ public class AutoRoutines {
         AutoTrajectory firstPiece = routine.trajectory("4-piece L1", 0);
         AutoTrajectory secondPiece = routine.trajectory("4-piece L1", 1);
         AutoTrajectory thirdPiece = routine.trajectory("4-piece L1", 2);
-        AutoTrajectory fourthPiece = routine.trajectory("4-piece L1", 3);
+        // AutoTrajectory fourthPiece = routine.trajectory("4-piece L1", 3);
 
         // @formatter:off
         routine.active().onTrue(Commands.sequence(
             firstPiece.resetOdometry(),
             firstPiece.cmd(),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(1.0),
+            Commands.waitSeconds(2.0),
             secondPiece.cmd(),
             Commands.runOnce(drive::stop),
-            Commands.waitSeconds(1.0),
+            Commands.waitSeconds(2.0),
             thirdPiece.cmd(),
-            Commands.runOnce(drive::stop),
-            Commands.waitSeconds(1.0),
-            fourthPiece.cmd(),
             Commands.runOnce(drive::stop)
+            // Commands.waitSeconds(1.0),
+            // fourthPiece.cmd(),
+            // Commands.runOnce(drive::stop)
         ));
         // @formatter:on
 

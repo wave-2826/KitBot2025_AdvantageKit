@@ -20,6 +20,10 @@ import frc.robot.subsystems.drive.GyroIOSim;
 import frc.robot.subsystems.drive.ModuleIO;
 import frc.robot.subsystems.drive.ModuleIOSim;
 import frc.robot.subsystems.drive.ModuleIOSpark;
+import frc.robot.subsystems.leds.LEDIO;
+import frc.robot.subsystems.leds.LEDIORio;
+import frc.robot.subsystems.leds.LEDIOSim;
+import frc.robot.subsystems.leds.LEDs;
 import frc.robot.subsystems.roller.Roller;
 import frc.robot.subsystems.roller.RollerIO;
 import frc.robot.subsystems.roller.RollerIOSim;
@@ -45,6 +49,7 @@ public class RobotContainer {
     private final Vision vision;
     private final Drive drive;
     private final Roller roller;
+    private final LEDs leds;
 
     // Only used in simulation
     private SwerveDriveSimulation driveSimulation = null;
@@ -73,6 +78,7 @@ public class RobotContainer {
                 var robotState = RobotState.getInstance();
                 vision = new Vision(new VisionIOLimelight(VisionConstants.leftCameraHostname, robotState::getRotation),
                     new VisionIOLimelight(VisionConstants.rightCameraHostname, robotState::getRotation));
+                leds = new LEDs(new LEDIORio());
                 break;
 
             case SIM:
@@ -94,6 +100,8 @@ public class RobotContainer {
                         driveSimulation::getSimulatedDriveTrainPose),
                     new VisionIOPhotonVisionSim(VisionConstants.rightCameraHostname, VisionConstants.rightCameraPos,
                         driveSimulation::getSimulatedDriveTrainPose));
+
+                leds = new LEDs(new LEDIOSim());
                 break;
 
             default:
@@ -108,6 +116,9 @@ public class RobotContainer {
                 });
                 vision = new Vision(new VisionIO() {
                 }, new VisionIO() {
+                });
+
+                leds = new LEDs(new LEDIO() {
                 });
                 break;
         }
@@ -131,6 +142,8 @@ public class RobotContainer {
 
         // Configure the button bindings
         Controls.getInstance().configureControls(drive, driveSimulation, roller, vision);
+
+        leds.configureControls();
     }
 
     public void updateAlerts() {
