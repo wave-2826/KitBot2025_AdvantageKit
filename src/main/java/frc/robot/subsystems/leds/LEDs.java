@@ -338,7 +338,7 @@ public class LEDs extends SubsystemBase {
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - fade * 2) / 255));
             } else {
-                setLEDColor(i, Color.lerpRGB(WAVE_GREEN, Color.kBlack, ((fade - 128) * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(Color.kBlack, WAVE_GREEN, ((fade - 128) * 2) / 255));
             }
         }
     }
@@ -358,7 +358,7 @@ public class LEDs extends SubsystemBase {
             if(twinkle < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - twinkle * 2) / 255));
             } else {
-                setLEDColor(i, Color.lerpRGB(WAVE_GREEN, Color.kBlack, (twinkle - 128) * 2));
+                setLEDColor(i, Color.lerpRGB(Color.kBlack, WAVE_GREEN, (twinkle - 128) * 2));
             }
         }
     }
@@ -369,7 +369,7 @@ public class LEDs extends SubsystemBase {
             if(fade < 128) {
                 setLEDColor(i, Color.lerpRGB(Color.kBlue, Color.kBlack, (255 - fade * 2) / 255));
             } else {
-                setLEDColor(i, Color.lerpRGB(Color.kRed, Color.kBlack, ((fade - 128) * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(Color.kBlack, Color.kRed, ((fade - 128) * 2) / 255));
             }
         }
     }
@@ -381,13 +381,6 @@ public class LEDs extends SubsystemBase {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             setLEDColor(i, color);
         }
-    }
-
-    /**
-     * A moving rainbow effect.
-     */
-    private void rainbow() {
-        rainbow(1, 1);
     }
 
     /**

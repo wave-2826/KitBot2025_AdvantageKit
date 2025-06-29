@@ -31,7 +31,11 @@ public class LEDIORio implements LEDIO {
         }
 
         for(int i = 0; i < LEDConstants.ledCount; i++) {
-            buffer.setLED(i, colors[i]);
+            // Gamma correction
+            double r = Math.pow(colors[i].red, 2.2);
+            double g = Math.pow(colors[i].green, 2.2);
+            double b = Math.pow(colors[i].blue, 2.2);
+            buffer.setLED(i, new Color(r, g, b));
         }
 
         leds.setData(buffer);
