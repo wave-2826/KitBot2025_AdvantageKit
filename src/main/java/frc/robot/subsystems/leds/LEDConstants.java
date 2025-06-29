@@ -5,7 +5,7 @@ package frc.robot.subsystems.leds;
  */
 public class LEDConstants {
     /** The DIO port used for LEDs. */
-    public static int ledDIOPort = 0;
+    public static int ledDIOPort = 1;
 
     /** If the LEDs have a GRB color order. */
     public static boolean isGRB = false;
