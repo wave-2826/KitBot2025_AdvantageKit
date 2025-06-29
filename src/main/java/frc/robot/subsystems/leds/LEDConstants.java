@@ -11,5 +11,5 @@ public class LEDConstants {
     public static boolean isGRB = false;
 
     /** The number of LEDs on the robot. */
-    public static int ledCount = 8 + 144;
+    public static int ledCount = 144;
 }

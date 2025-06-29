@@ -18,11 +18,6 @@ public class LEDIORio implements LEDIO {
         buffer = new AddressableLEDBuffer(LEDConstants.ledCount);
 
         leds.setLength(LEDConstants.ledCount);
-
-        // Required for the CANdle
-        leds.setBitTiming(350, 900, 900, 350);
-        leds.setSyncTime(100);
-
         leds.setData(buffer);
         leds.start();
     }
