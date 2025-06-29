@@ -336,9 +336,9 @@ public class LEDs extends SubsystemBase {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             double fade = (time * 150 + 10 + i * 5) % 256;
             if(fade < 128) {
-                setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - fade * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(Color.kBlack, WAVE_BLUE, (255 - fade * 2) / 255));
             } else {
-                setLEDColor(i, Color.lerpRGB(Color.kBlack, WAVE_GREEN, ((fade - 128) * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(WAVE_GREEN, Color.kBlack, ((fade - 128) * 2) / 255));
             }
         }
     }
@@ -354,7 +354,7 @@ public class LEDs extends SubsystemBase {
 
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             // Twinkle effect with random offsets
-            int twinkle = ((int) (time * 70 + 20) + (int) twinkleOffsets[i]) % 256;
+            int twinkle = ((int) (time * 25 + 20) + (int) twinkleOffsets[i]) % 256;
             if(twinkle < 128) {
                 setLEDColor(i, Color.lerpRGB(WAVE_BLUE, Color.kBlack, (255 - twinkle * 2) / 255));
             } else {
@@ -367,9 +367,9 @@ public class LEDs extends SubsystemBase {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             double fade = (time * 205 + 55 + i * 5) % 256;
             if(fade < 128) {
-                setLEDColor(i, Color.lerpRGB(Color.kBlue, Color.kBlack, (255 - fade * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(Color.kBlack, Color.kBlue, (255 - fade * 2) / 255));
             } else {
-                setLEDColor(i, Color.lerpRGB(Color.kBlack, Color.kRed, ((fade - 128) * 2) / 255));
+                setLEDColor(i, Color.lerpRGB(Color.kRed, Color.kBlack, ((fade - 128) * 2) / 255));
             }
         }
     }
@@ -389,7 +389,7 @@ public class LEDs extends SubsystemBase {
     public void rainbow(double saturationScalar, double speedScalar) {
         for(int i = 0; i < LEDConstants.ledCount; i++) {
             double t = (time * speedScalar + i / (double) LEDConstants.ledCount) % 1.;
-            setLEDColor(i, Color.fromHSV((int) (t * 255), (int) (255 * saturationScalar), 255));
+            setLEDColor(i, Color.fromHSV((int) (t * 180), (int) (255 * saturationScalar), 255));
         }
     }
 
