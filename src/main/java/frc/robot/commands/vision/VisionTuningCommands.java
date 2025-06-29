@@ -9,8 +9,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionConstants;
-
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import frc.robot.util.LoggedAutoChooser;
 
 public class VisionTuningCommands {
     private static class TransformAverage {
@@ -43,9 +42,9 @@ public class VisionTuningCommands {
     }
 
     /** Adds the drive tuning commands to the auto chooser. */
-    public static void addTuningCommandsToAutoChooser(Vision vision, LoggedDashboardChooser<Command> chooser) {
+    public static void addTuningCommandsToAutoChooser(Vision vision, LoggedAutoChooser chooser) {
         // We may want to run this at a competition
-        chooser.addOption("TUNING | Vision Camera Position Measurement", measureCameraPositions(vision));
+        chooser.addCmd("TUNING | Vision Camera Position Measurement", () -> measureCameraPositions(vision));
     }
 
     /** The transform of the calibration tag, relative to the robot base. */

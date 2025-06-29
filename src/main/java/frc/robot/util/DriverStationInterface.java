@@ -3,26 +3,15 @@ package frc.robot.util;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 import org.littletonrobotics.junction.networktables.LoggedNetworkString;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.commands.PathPlannerAuto;
-import com.pathplanner.lib.config.RobotConfig;
-import com.pathplanner.lib.path.PathPlannerPath;
-import com.pathplanner.lib.trajectory.PathPlannerTrajectory;
-import com.pathplanner.lib.trajectory.PathPlannerTrajectoryState;
 import com.sun.net.httpserver.HttpServer;
 import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj.DriverStation;
 import frc.robot.FieldConstants.ReefBranch;
 import frc.robot.FieldConstants.ReefLevel;
-import frc.robot.subsystems.drive.DriveConstants;
 
 public class DriverStationInterface {
     /**
@@ -112,71 +101,42 @@ public class DriverStationInterface {
         try {
             jsonData.append("{\"autoChoices\": [");
 
-            List<String> autoNames = AutoBuilder.getAllAutoNames();
-            for(String choice : autoNames) {
-                // Skip autos that don't make sense to show
-                if(choice.contains("testing") || choice.toLowerCase().contains("tuning")) continue;
+            // List<String> autoNames = AutoBuilder.getAllAutoNames();
+            // for(String choice : autoNames) {
+            //     // Skip autos that don't make sense to show
+            //     if(choice.contains("testing") || choice.toLowerCase().contains("tuning")) continue;
 
-                jsonData.append("{\"name\": \"").append(choice).append("\", \"poses\": [");
+            //     jsonData.append("{\"name\": \"").append(choice).append("\", \"poses\": [");
 
-                List<PathPlannerPath> pathGroup = PathPlannerAuto.getPathGroupFromAutoFile(choice);
-                PathPlannerTrajectory simulatedPath = simulateAuto(pathGroup, DriveConstants.pathplannerConfig);
+            //     List<PathPlannerPath> pathGroup = PathPlannerAuto.getPathGroupFromAutoFile(choice);
+            //     PathPlannerTrajectory simulatedPath = simulateAuto(pathGroup, DriveConstants.pathplannerConfig);
 
-                double sampleInterval = 0.04;
-                double totalTime = Math.min(simulatedPath.getTotalTimeSeconds(), 15);
+            //     double sampleInterval = 0.04;
+            //     double totalTime = Math.min(simulatedPath.getTotalTimeSeconds(), 15);
 
-                for(double t = 0; t < totalTime; t += sampleInterval) {
-                    PathPlannerTrajectoryState state = simulatedPath.sample(t);
+            //     for(double t = 0; t < totalTime; t += sampleInterval) {
+            //         PathPlannerTrajectoryState state = simulatedPath.sample(t);
 
-                    // @formatter:off
-                    jsonData.append("{\"x\": ").append(Math.round(state.pose.getX() * 1000) / 1000.0)
-                        .append(", \"y\": ").append(Math.round(state.pose.getY() * 1000) / 1000.0)
-                        .append(", \"rot\": ").append(Math.round(state.pose.getRotation().getRadians() * 1000) / 1000.0)
-                        .append(", \"t\": ").append(Math.round(t * 1000) / 1000.0)
-                        .append("},");
-                    // @formatter:on
-                }
+            //         // @formatter:off
+            //         jsonData.append("{\"x\": ").append(Math.round(state.pose.getX() * 1000) / 1000.0)
+            //             .append(", \"y\": ").append(Math.round(state.pose.getY() * 1000) / 1000.0)
+            //             .append(", \"rot\": ").append(Math.round(state.pose.getRotation().getRadians() * 1000) / 1000.0)
+            //             .append(", \"t\": ").append(Math.round(t * 1000) / 1000.0)
+            //             .append("},");
+            //         // @formatter:on
+            //     }
 
-                if(totalTime > 0) jsonData.deleteCharAt(jsonData.length() - 1);
-                jsonData.append("]},");
-            }
+            //     if(totalTime > 0) jsonData.deleteCharAt(jsonData.length() - 1);
+            //     jsonData.append("]},");
+            // }
 
-            if(!autoNames.isEmpty()) jsonData.deleteCharAt(jsonData.length() - 1);
+            // if(!autoNames.isEmpty()) jsonData.deleteCharAt(jsonData.length() - 1);
             jsonData.append("]}");
         } catch(Exception e) {
             System.out.println("Error loading auto data: " + e.getMessage());
         }
 
         return jsonData.toString();
-    }
-
-    static PathPlannerTrajectory simulateAuto(List<PathPlannerPath> paths, RobotConfig robotConfig) {
-        if(paths.isEmpty()) return null;
-
-        ArrayList<PathPlannerTrajectoryState> allStates = new ArrayList<>();
-
-        PathPlannerPath firstPath = paths.get(0);
-        Pose2d startPose = new Pose2d(firstPath.getAllPathPoints().get(0).position,
-            firstPath.getIdealStartingState().rotation());
-        ChassisSpeeds startSpeeds = new ChassisSpeeds();
-
-        for(PathPlannerPath p : paths) {
-            PathPlannerTrajectory simPath = new PathPlannerTrajectory(p, startSpeeds, startPose.getRotation(),
-                robotConfig);
-
-            PathPlannerTrajectoryState lastState = allStates.isEmpty() ? null : allStates.get(allStates.size() - 1);
-
-            double startTime = lastState != null ? lastState.timeSeconds : 0;
-            for(PathPlannerTrajectoryState s : simPath.getStates()) {
-                allStates.add(s.copyWithTime(s.timeSeconds + startTime));
-            }
-
-            lastState = allStates.get(allStates.size() - 1);
-            startPose = new Pose2d(lastState.pose.getTranslation(), lastState.pose.getRotation());
-            startSpeeds = lastState.fieldSpeeds;
-        }
-
-        return new PathPlannerTrajectory(allStates);
     }
 
     /**

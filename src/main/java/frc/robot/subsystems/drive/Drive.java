@@ -1,17 +1,9 @@
 package frc.robot.subsystems.drive;
 
 import static frc.robot.subsystems.drive.DriveConstants.maxSpeedMetersPerSec;
-import static frc.robot.subsystems.drive.DriveConstants.maxSteerVelocity;
 import static frc.robot.subsystems.drive.DriveConstants.moduleTranslations;
-import static frc.robot.subsystems.drive.DriveConstants.pathplannerConfig;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.commands.PathfindingCommand;
-import com.pathplanner.lib.pathfinding.Pathfinding;
-import com.pathplanner.lib.util.DriveFeedforwards;
-import com.pathplanner.lib.util.PathPlannerLogging;
-import com.pathplanner.lib.util.swerve.SwerveSetpoint;
-import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -22,12 +14,10 @@ import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.RobotState;
 import frc.robot.Constants.Mode;
-import frc.robot.util.LocalADStarAK;
 
 import java.util.Optional;
 import java.util.concurrent.locks.Lock;
@@ -35,6 +25,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+
+import choreo.Choreo.TrajectoryLogger;
+import choreo.auto.AutoFactory;
+import choreo.trajectory.SwerveSample;
 
 /**
  * The drivetrain subsystem. Manages the swerve drive including all modules, the gyro, kinematics, odometry, and system
@@ -50,14 +44,6 @@ public class Drive extends SubsystemBase {
 
     public SwerveDriveKinematics kinematics = new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
-    // See https://pathplanner.dev/pplib-swerve-setpoint-generator.html
-    // We use PathPlanner's variation of 254's setpoint generator which takes a prior setpoint,
-    // a desired setpoint, and outputs a new setpoint that respects all the kinematic constraints
-    // on module rotation and wheel velocity/torque, as well as preventing any forces acting on a
-    // module's wheel from exceeding the force of friction.
-    private final SwerveSetpointGenerator setpointGenerator;
-    private SwerveSetpoint previousSetpoint;
-
     /** If the setpoints have been updated this loop. Used to avoid continuing at a speed when we tell it to stop. */
     private boolean setpointsUpdated = false;
     /** If we're currently controlling the robot with velocity. */
@@ -69,6 +55,10 @@ public class Drive extends SubsystemBase {
     private final Debouncer unlockWheelsDebouncer = new Debouncer(2.0, Debouncer.DebounceType.kFalling);
     /** If the wheels are currently in brake mode. */
     private boolean wheelsLocked = true;
+
+    private final PIDController xController = new PIDController(6.5, 0.0, 0.25);
+    private final PIDController yController = new PIDController(6.5, 0.0, 0.25);
+    private final PIDController thetaController = new PIDController(8.0, 1.0, 0.75);
 
     /**
      * Constructs a new Drive subsystem.
@@ -91,39 +81,46 @@ public class Drive extends SubsystemBase {
         // Start odometry thread
         SparkOdometryThread.getInstance().start();
 
-        // Configure AutoBuilder for PathPlanner
-        var robotState = RobotState.getInstance();
-        AutoBuilder.configure(robotState::getPose, this::setPose, this::getChassisSpeeds,
-            this::runVelocityWithFeedforward,
-            Constants.isSim ? DriveConstants.simHolonomicDriveController : DriveConstants.realHolonomicDriveController,
-            pathplannerConfig, () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red, this);
-        Pathfinding.setPathfinder(new LocalADStarAK());
-        PathPlannerLogging.setLogActivePathCallback((activePath) -> {
-            Logger.recordOutput("Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
-        });
-        PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
-            Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
-        });
-        PathPlannerLogging.setLogCurrentPoseCallback((targetPose) -> {
-            Logger.recordOutput("Odometry/CurrentPose", targetPose);
-        });
-
-        // Due to how Java works, the first run of pathfinding commands can have significantly higher delay than subsequent runs.
-        // This can be partially alleviated by running a warmup command in the background when code starts.
-        // It won't control the robot; it simply runs through a full pathfinding command to warm up the library.
-        PathfindingCommand.warmupCommand().schedule();
-
-        setpointGenerator = new SwerveSetpointGenerator(pathplannerConfig, maxSteerVelocity);
-        previousSetpoint = new SwerveSetpoint(getChassisSpeeds(), getModuleStates(), DriveFeedforwards.zeros(4));
+        thetaController.enableContinuousInput(-Math.PI, Math.PI);
     }
 
     /**
-     * Runs the drive at the desired robot-relative velocity with the specified feedforwards.
+     * Creates a new auto factory for this drivetrain with the given trajectory logger.
      *
-     * @param speeds Speeds in meters/sec
+     * @param trajLogger Logger for the trajectory
+     * @return AutoFactory for this drivetrain
      */
-    public void runVelocityWithFeedforward(ChassisSpeeds speeds, DriveFeedforwards feedforwards) {
-        runVelocity(speeds, feedforwards.accelerationsMPSSq());
+    public AutoFactory createAutoFactory(TrajectoryLogger<SwerveSample> trajLogger) {
+        var robotState = RobotState.getInstance();
+        return new AutoFactory(robotState::getPose, this::setPose, this::followPath, true, this, trajLogger);
+    }
+
+    /**
+     * Follows the given field-centric path sample with PID.
+     *
+     * @param sample Sample along the path to follow
+     */
+    public void followPath(SwerveSample sample) {
+        var pose = RobotState.getInstance().getPose();
+
+        Logger.recordOutput("Odometry/CurrentPose", pose);
+        Logger.recordOutput("Odometry/TargetPose", sample.getPose());
+
+        var targetSpeeds = sample.getChassisSpeeds();
+        targetSpeeds.vxMetersPerSecond += xController.calculate(pose.getX(), sample.x);
+        targetSpeeds.vyMetersPerSecond += yController.calculate(pose.getY(), sample.y);
+        targetSpeeds.omegaRadiansPerSecond += thetaController.calculate(pose.getRotation().getRadians(),
+            sample.heading);
+
+        double[] accelerations = new double[modules.length];
+        for(int i = 0; i < modules.length; i++) {
+            double accelerationX = sample.moduleForcesX()[i] / DriveConstants.robotMassKg;
+            double accelerationY = sample.moduleForcesY()[i] / DriveConstants.robotMassKg;
+            accelerations[i] = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
+        }
+
+        runVelocity(ChassisSpeeds.fromFieldRelativeSpeeds(targetSpeeds, RobotState.getInstance().getRotation()),
+            accelerations);
     }
 
     /**
@@ -140,7 +137,6 @@ public class Drive extends SubsystemBase {
      *
      * @param speeds Speeds in meters/sec
      */
-    @SuppressWarnings("unused")
     public void runVelocity(ChassisSpeeds speeds, double[] accelerationsMps2) {
         Logger.recordOutput("SwerveChassisSpeeds/TargetSpeeds", speeds);
 
@@ -148,18 +144,9 @@ public class Drive extends SubsystemBase {
         velocityControlMode = true;
         latestSpeedSetpoint = speeds;
 
-        // Calculate module setpoints
-        // We only use the setpoint generator in teleoperated since Choreo already only generates possible trajectories.
-        SwerveModuleState[] setpointStates;
-        if(DriveConstants.USE_SETPOINT_GENERATOR && DriverStation.isTeleop()) {
-            previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, speeds, 0.02);
-            setpointStates = previousSetpoint.moduleStates();
-            accelerationsMps2 = previousSetpoint.feedforwards().accelerationsMPSSq();
-        } else {
-            ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
-            setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
-            SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, maxSpeedMetersPerSec);
-        }
+        ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
+        SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
+        SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, maxSpeedMetersPerSec);
 
         // Log unoptimized setpoints
         Logger.recordOutput("SwerveStates/Setpoints", setpointStates);

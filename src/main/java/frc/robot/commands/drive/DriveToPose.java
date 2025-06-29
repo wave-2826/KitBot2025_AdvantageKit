@@ -52,21 +52,6 @@ public class DriveToPose extends Command {
     private static final LoggedTunableNumber thetaMaxAcceleration = new LoggedTunableNumber( //
         "DriveToPose/ThetaMaxAcceleration", Units.degreesToRadians(500));
 
-    // Drive and turn constraints when the elevator is at the top
-    private static final LoggedTunableNumber driveMaxVelocityTop = new LoggedTunableNumber( //
-        "DriveToPose/DriveMaxVelocityTop", DriveConstants.maxSpeedMetersPerSec);
-    private static final LoggedTunableNumber driveMaxAccelerationTop = new LoggedTunableNumber( //
-        "DriveToPose/DriveMaxAccelerationTop", 2.5);
-    private static final LoggedTunableNumber thetaMaxVelocityTop = new LoggedTunableNumber( //
-        "DriveToPose/ThetaMaxVelocityTop", Units.degreesToRadians(300.0));
-    private static final LoggedTunableNumber thetaMaxAccelerationTop = new LoggedTunableNumber( //
-        "DriveToPose/ThetaMaxAccelerationTop", Units.degreesToRadians(400));
-
-    // The minimum height (as a percentage) of the elevator before we start interpolating towards the
-    // top constraints
-    private static final LoggedTunableNumber elevatorMinExtension = new LoggedTunableNumber( //
-        "DriveToPose/ElevatorMinExtension", 0.4);
-
     private static final LoggedTunableNumber setpointMinVelocity = new LoggedTunableNumber( //
         "DriveToPose/SetpointMinVelocity", -0.5); // The most negative velocity we will command after velocity correction.
     private static final LoggedTunableNumber minDistanceVelocityCorrection = new LoggedTunableNumber( //
@@ -249,17 +234,11 @@ public class DriveToPose extends Command {
 
     /** Updates our profile constraints based on our possible acceleration. */
     private void updateConstraints() {
-        double elevatorT = MathUtil
-            .clamp((RobotState.getInstance().getElevatorHeightPercent() - elevatorMinExtension.get())
-                / (1.0 - elevatorMinExtension.get()), 0.0, 1.0);
+        driveProfile = new TrapezoidProfile(
+            new TrapezoidProfile.Constraints(driveMaxVelocity.get(), driveMaxAcceleration.get()));
 
-        driveProfile = new TrapezoidProfile(new TrapezoidProfile.Constraints(
-            MathUtil.interpolate(driveMaxVelocity.get(), driveMaxVelocityTop.get(), elevatorT),
-            MathUtil.interpolate(driveMaxAcceleration.get(), driveMaxAccelerationTop.get(), elevatorT)));
-
-        thetaController.setConstraints(new TrapezoidProfile.Constraints(
-            MathUtil.interpolate(thetaMaxVelocity.get(), thetaMaxVelocityTop.get(), elevatorT),
-            MathUtil.interpolate(thetaMaxAcceleration.get(), thetaMaxAccelerationTop.get(), elevatorT)));
+        thetaController
+            .setConstraints(new TrapezoidProfile.Constraints(thetaMaxVelocity.get(), thetaMaxAcceleration.get()));
     }
 
     /**

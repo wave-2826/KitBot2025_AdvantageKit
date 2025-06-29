@@ -2,8 +2,6 @@ package frc.robot.commands;
 
 import static edu.wpi.first.units.Units.Meters;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.path.PathConstraints;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -18,8 +16,10 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import frc.robot.FieldConstants;
 import frc.robot.RobotState;
+import frc.robot.commands.drive.DriveToPose;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.DriveConstants;
+import frc.robot.subsystems.roller.Roller;
 import frc.robot.util.Container;
 import frc.robot.util.DriverStationInterface;
 import frc.robot.util.LoggedTunableNumber;
@@ -152,12 +152,8 @@ public class DriveCommands {
         return driveStraightCommand(drive, speedMetersPerSecond, fieldAngle, robotAngle).withTimeout(timeSeconds);
     }
 
-    public static Command pathfindToActiveBranch(Drive drive) {
+    public static Command scoreAtActiveBranch(Drive drive, Roller roller) {
         Pose2d targetPose = getLineupPose(DriverStationInterface.getInstance().getReefTarget());
-
-        PathConstraints constraints = new PathConstraints(DriveConstants.maxSpeedMetersPerSec, 6.9,
-            Units.degreesToRadians(480), Units.degreesToRadians(960));
-
-        return AutoBuilder.pathfindToPose(targetPose, constraints, 0);
+        return new DriveToPose(drive, targetPose).andThen(roller.runPercent(0.5).withTimeout(0.5));
     }
 }

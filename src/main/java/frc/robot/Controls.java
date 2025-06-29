@@ -74,17 +74,8 @@ public class Controls {
 
         operator.a().whileTrue(roller.runPercent(0.5));
 
-        final AtomicReference<Command> currentPathfindCommand = new AtomicReference<>();
-        driver.b().onTrue(Commands.runOnce(() -> {
-            Command cmd = Commands.defer(() -> DriveCommands.pathfindToActiveBranch(drive), Set.of(drive));
-            currentPathfindCommand.set(cmd);
-            cmd.schedule();
-        })).onFalse(Commands.runOnce(() -> {
-            Command cmd = currentPathfindCommand.getAndSet(null);
-            if(cmd != null) {
-                cmd.cancel();
-            }
-        }));
+        driver.b()
+            .whileTrue(Commands.defer(() -> DriveCommands.scoreAtActiveBranch(drive, roller), Set.of(drive, roller)));
 
         // Endgame Alerts
         Trigger endgameAlert1Trigger = new Trigger(() -> DriverStation.isTeleopEnabled()
