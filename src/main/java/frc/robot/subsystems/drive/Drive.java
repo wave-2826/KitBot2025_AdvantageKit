@@ -1,18 +1,9 @@
 package frc.robot.subsystems.drive;
 
 import static frc.robot.subsystems.drive.DriveConstants.maxSpeedMetersPerSec;
-import static frc.robot.subsystems.drive.DriveConstants.maxSteerVelocity;
 import static frc.robot.subsystems.drive.DriveConstants.moduleTranslations;
-import static frc.robot.subsystems.drive.DriveConstants.pathplannerConfig;
 
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.commands.PathfindingCommand;
-import com.pathplanner.lib.pathfinding.Pathfinding;
-import com.pathplanner.lib.util.DriveFeedforwards;
-import com.pathplanner.lib.util.FlippingUtil;
-import com.pathplanner.lib.util.PathPlannerLogging;
-import com.pathplanner.lib.util.swerve.SwerveSetpoint;
-import com.pathplanner.lib.util.swerve.SwerveSetpointGenerator;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -20,19 +11,15 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.DriverStation.Alliance;
-import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import frc.robot.Constants;
-import frc.robot.FieldConstants;
 import frc.robot.RobotState;
 import frc.robot.Constants.Mode;
-import frc.robot.commands.drive.DriveCommands;
-import frc.robot.util.LocalADStarAK;
 
 import java.util.Optional;
 import java.util.concurrent.locks.Lock;
@@ -40,6 +27,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
+
+import choreo.Choreo.TrajectoryLogger;
+import choreo.auto.AutoFactory;
+import choreo.trajectory.SwerveSample;
 
 /**
  * The drivetrain subsystem. Manages the swerve drive including all modules, the gyro, kinematics, odometry, and system
@@ -55,25 +46,25 @@ public class Drive extends SubsystemBase {
 
     public SwerveDriveKinematics kinematics = new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
-    // See https://pathplanner.dev/pplib-swerve-setpoint-generator.html
-    // We use PathPlanner's variation of 254's setpoint generator which takes a prior setpoint,
-    // a desired setpoint, and outputs a new setpoint that respects all the kinematic constraints
-    // on module rotation and wheel velocity/torque, as well as preventing any forces acting on a
-    // module's wheel from exceeding the force of friction.
-    private final SwerveSetpointGenerator setpointGenerator;
-    private SwerveSetpoint previousSetpoint;
+    /**
+     * If the trajectory following callback was run this tick. Reset at the end of each loop iteration so we know when
+     * to continue pathing to the latest known pose.
+     */
+    private boolean trajectoryUpdatedThisTick = false;
+    /** The latest trajectory target. See trajectoryUpdatedThisTick. If null, no trajectory has been followed yet. */
+    private Pose2d latestTrajectoryTarget = null;
 
-    /** If the setpoints have been updated this loop. Used to avoid continuing at a speed when we tell it to stop. */
-    private boolean setpointsUpdated = false;
     /** If we're currently controlling the robot with velocity. */
     private boolean velocityControlMode = true;
-    /** The latest speed setpoint for velocity control. */
-    private ChassisSpeeds latestSpeedSetpoint = new ChassisSpeeds();
 
     /** A debouncer that automatically unlocks the wheels after the robot has been disabled for a period of time. */
     private final Debouncer unlockWheelsDebouncer = new Debouncer(2.0, Debouncer.DebounceType.kFalling);
     /** If the wheels are currently in brake mode. */
     private boolean wheelsLocked = true;
+
+    private final PIDController xController = new PIDController(8.5, 0.0, 0.0);
+    private final PIDController yController = new PIDController(8.5, 0.0, 0.0);
+    private final PIDController thetaController = new PIDController(8.0, 1.5, 1.25);
 
     /**
      * Constructs a new Drive subsystem.
@@ -96,53 +87,58 @@ public class Drive extends SubsystemBase {
         // Start odometry thread
         SparkOdometryThread.getInstance().start();
 
-        // Configure AutoBuilder for PathPlanner
-        var robotState = RobotState.getInstance();
-        AutoBuilder.configure(robotState::getPose, this::setPose, this::getChassisSpeeds,
-            this::runVelocityWithFeedforward,
-            Constants.isSim ? DriveConstants.simHolonomicDriveController : DriveConstants.realHolonomicDriveController,
-            pathplannerConfig, () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red, this);
-        Pathfinding.setPathfinder(new LocalADStarAK());
-        PathPlannerLogging.setLogActivePathCallback((activePath) -> {
-            Logger.recordOutput("Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
-        });
-        PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
-            // HACK: what is pathplanner doing
-            if(!Constants.isSim) {
-                boolean isRed = DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red;
-                if(DriverStation.isEnabled() && isRed && targetPose.getX() < FieldConstants.fieldLength / 2) {
-                    System.out.println("Stopping auto; PathPlanner is trying to destroy the robot again");
-                    CommandScheduler.getInstance().cancelAll();
-                    DriveCommands.driveStraightCommand(this, Units.feetToMeters(2), 1,
-                        () -> FlippingUtil.flipFieldRotation(Rotation2d.kZero)).schedule();
-                }
-                if(DriverStation.isEnabled() && !isRed && targetPose.getX() > FieldConstants.fieldLength / 2) {
-                    System.out.println("Stopping auto; PathPlanner is trying to destroy the robot again");
-                    CommandScheduler.getInstance().cancelAll();
-                    DriveCommands.driveStraightCommand(this, Units.feetToMeters(2), 1,
-                        () -> FlippingUtil.flipFieldRotation(Rotation2d.kZero)).schedule();
-                }
-            }
+        thetaController.enableContinuousInput(-Math.PI, Math.PI);
 
-            Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
-        });
-
-        // Due to how Java works, the first run of pathfinding commands can have significantly higher delay than subsequent runs.
-        // This can be partially alleviated by running a warmup command in the background when code starts.
-        // It won't control the robot; it simply runs through a full pathfinding command to warm up the library.
-        PathfindingCommand.warmupCommand().schedule();
-
-        setpointGenerator = new SwerveSetpointGenerator(pathplannerConfig, maxSteerVelocity);
-        previousSetpoint = new SwerveSetpoint(getChassisSpeeds(), getModuleStates(), DriveFeedforwards.zeros(4));
+        RobotModeTriggers.autonomous().onTrue(Commands.runOnce(() -> {
+            latestTrajectoryTarget = null;
+        }));
     }
 
     /**
-     * Runs the drive at the desired robot-relative velocity with the specified feedforwards.
+     * Creates a new auto factory for this drivetrain with the given trajectory logger.
      *
-     * @param speeds Speeds in meters/sec
+     * @param trajLogger Logger for the trajectory
+     * @return AutoFactory for this drivetrain
      */
-    public void runVelocityWithFeedforward(ChassisSpeeds speeds, DriveFeedforwards feedforwards) {
-        runVelocity(speeds, feedforwards.accelerationsMPSSq());
+    public AutoFactory createAutoFactory(TrajectoryLogger<SwerveSample> trajLogger) {
+        var robotState = RobotState.getInstance();
+        return new AutoFactory(robotState::getPose, this::setPose, this::followPath, true, this, trajLogger);
+    }
+
+    /**
+     * Follows the given field-centric path sample with PID.
+     *
+     * @param sample Sample along the path to follow
+     */
+    public void followPath(SwerveSample sample) {
+        trajectoryUpdatedThisTick = true;
+        latestTrajectoryTarget = sample.getPose();
+
+        var baseSpeeds = sample.getChassisSpeeds();
+
+        double[] accelerations = new double[modules.length];
+        for(int i = 0; i < modules.length; i++) {
+            double accelerationX = sample.moduleForcesX()[i] / DriveConstants.robotMassKg;
+            double accelerationY = sample.moduleForcesY()[i] / DriveConstants.robotMassKg;
+            accelerations[i] = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
+        }
+
+        followPathToTarget(latestTrajectoryTarget, accelerations, baseSpeeds);
+    }
+
+    public void followPathToTarget(Pose2d targetPose, double[] accelerations, ChassisSpeeds baseSpeeds) {
+        var pose = RobotState.getInstance().getPose();
+
+        Logger.recordOutput("Odometry/CurrentPose", pose);
+        Logger.recordOutput("Odometry/TargetPose", targetPose);
+
+        baseSpeeds.vxMetersPerSecond += xController.calculate(pose.getX(), targetPose.getX());
+        baseSpeeds.vyMetersPerSecond += yController.calculate(pose.getY(), targetPose.getY());
+        baseSpeeds.omegaRadiansPerSecond += thetaController.calculate(pose.getRotation().getRadians(),
+            targetPose.getRotation().getRadians());
+
+        runVelocity(ChassisSpeeds.fromFieldRelativeSpeeds(baseSpeeds, RobotState.getInstance().getRotation()),
+            accelerations);
     }
 
     /**
@@ -159,26 +155,14 @@ public class Drive extends SubsystemBase {
      *
      * @param speeds Speeds in meters/sec
      */
-    @SuppressWarnings("unused")
     public void runVelocity(ChassisSpeeds speeds, double[] accelerationsMps2) {
         Logger.recordOutput("SwerveChassisSpeeds/TargetSpeeds", speeds);
 
-        setpointsUpdated = true;
         velocityControlMode = true;
-        latestSpeedSetpoint = speeds;
 
-        // Calculate module setpoints
-        // We only use the setpoint generator in teleoperated since Choreo already only generates possible trajectories.
-        SwerveModuleState[] setpointStates;
-        if(DriveConstants.USE_SETPOINT_GENERATOR && DriverStation.isTeleop()) {
-            previousSetpoint = setpointGenerator.generateSetpoint(previousSetpoint, speeds, 0.02);
-            setpointStates = previousSetpoint.moduleStates();
-            accelerationsMps2 = previousSetpoint.feedforwards().accelerationsMPSSq();
-        } else {
-            ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
-            setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
-            SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, maxSpeedMetersPerSec);
-        }
+        ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
+        SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
+        SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, maxSpeedMetersPerSec);
 
         // Log unoptimized setpoints
         Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
@@ -344,13 +328,14 @@ public class Drive extends SubsystemBase {
         // Update gyro alert
         gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
 
-        // Subsystems are updated first, so this adds a bit of latency. Therefore,
-        // we only update when our commands already didn't immediately update.
-        // If they didn't, we manually run velocity control to avoid situations where the robot
-        // continues moving after we tell it to stop.
-        if(!setpointsUpdated && velocityControlMode && DriverStation.isEnabled()) {
-            runVelocity(latestSpeedSetpoint);
+        if(!trajectoryUpdatedThisTick && velocityControlMode && latestTrajectoryTarget != null
+            && DriverStation.isAutonomousEnabled()) {
+            followPathToTarget( //
+                latestTrajectoryTarget, //
+                new double[modules.length], //
+                new ChassisSpeeds(0., 0., 0.) //
+            );
         }
-        setpointsUpdated = false;
+        trajectoryUpdatedThisTick = false;
     }
 }

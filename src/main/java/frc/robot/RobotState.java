@@ -3,8 +3,6 @@ package frc.robot;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.littletonrobotics.junction.AutoLogOutput;
-import com.pathplanner.lib.auto.AutoBuilder;
-import com.pathplanner.lib.util.FlippingUtil;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -16,8 +14,11 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.util.DriverStationInterface;
+import frc.robot.util.FlippingUtil;
 import frc.robot.util.poseEstimator.OdometrySwerveDrivePoseEstimator;
 
 /**
@@ -31,6 +32,10 @@ public class RobotState {
 
     public static RobotState getInstance() {
         return instance;
+    }
+
+    public static boolean shouldFlip() {
+        return DriverStation.getAlliance().orElse(Alliance.Blue).equals(Alliance.Red);
     }
 
     private RobotState() {
@@ -58,31 +63,6 @@ public class RobotState {
 
     @AutoLogOutput(key = "Odometry/RobotVelocity")
     private ChassisSpeeds robotVelocity = new ChassisSpeeds();
-
-    private double elevatorHeightPercent = 0.0;
-
-    public void updateElevatorHeightPercent(double percent) {
-        elevatorHeightPercent = percent;
-    }
-
-    public double getElevatorHeightPercent() {
-        return elevatorHeightPercent;
-    }
-
-    private boolean reefLineupSafe = false;
-
-    public void setReefLineupSafe(boolean safe) {
-        reefLineupSafe = safe;
-    }
-
-    /**
-     * Gets whether it's currently safe to line up closely with the reef. This will not be true if the arm is moving
-     * upward and will collide.
-     * @return
-     */
-    public boolean isReefLineupSafe() {
-        return reefLineupSafe;
-    }
 
     /**
      * Gets the pose at the specified timestamp. This includes vision compensation, so it's a real estimated field pose.
@@ -140,7 +120,7 @@ public class RobotState {
      */
     @AutoLogOutput(key = "Odometry/IsOnRightSide")
     public boolean isOnRightSide() {
-        var bluePose = AutoBuilder.shouldFlip() ? FlippingUtil.flipFieldPose(RobotState.getInstance().getPose())
+        var bluePose = RobotState.shouldFlip() ? FlippingUtil.flipFieldPose(RobotState.getInstance().getPose())
             : RobotState.getInstance().getPose();
         return bluePose.getY() < FieldConstants.fieldWidth / 2.;
     }
@@ -162,9 +142,6 @@ public class RobotState {
     /** Adds a new timestamped vision measurement. */
     public void addVisionMeasurement(Pose2d visionRobotPoseMeters, double timestampSeconds,
         Matrix<N3, N1> visionMeasurementStdDevs) {
-        // Logger.recordOutput("Vision/StdDevs1", visionMeasurementStdDevs.get(0, 0));
-        // Logger.recordOutput("Vision/StdDevs2", visionMeasurementStdDevs.get(1, 0));
-        // Logger.recordOutput("Vision/StdDevs3", visionMeasurementStdDevs.get(2, 0));
         poseEstimator.addVisionMeasurement(visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
     }
 

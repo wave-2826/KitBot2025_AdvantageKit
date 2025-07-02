@@ -162,7 +162,11 @@ public class Vision extends SubsystemBase {
     public Pose3d[] getRobotTransforms() {
         Pose3d[] results = new Pose3d[io.length];
         for(int cameraIndex = 0; cameraIndex < io.length; cameraIndex++) {
-            results[cameraIndex] = inputs[cameraIndex].poseObservations[0].pose();
+            if(inputs[cameraIndex].poseObservations.length > 0) {
+                results[cameraIndex] = inputs[cameraIndex].poseObservations[0].pose();
+            } else {
+                results[cameraIndex] = null;
+            }
         }
         return results;
     }

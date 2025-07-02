@@ -19,6 +19,8 @@ import frc.robot.RobotState;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.DriveConstants;
 import frc.robot.util.Container;
+import frc.robot.util.LoggedAutoChooser;
+
 import java.io.FileReader;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -27,7 +29,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 /**
  * A collection of commands for tuning the drive subsystem. All drive tuning commands print their results and save them
@@ -103,32 +104,32 @@ public class DriveTuningCommands {
     }
 
     /** Adds the drive tuning commands to the auto chooser. */
-    public static void addTuningCommandsToAutoChooser(Drive drive, LoggedDashboardChooser<Command> chooser) {
+    public static void addTuningCommandsToAutoChooser(Drive drive, LoggedAutoChooser chooser) {
         // We might want to run these at a competition
-        chooser.addOption("TUNING | Drive Wheel Radius Characterization", wheelRadiusCharacterization(drive));
-        chooser.addOption("TUNING | Drive Slip Current Measurement", slipCurrentMeasurement(drive));
+        chooser.addCmd("TUNING | Drive Wheel Radius Characterization", () -> wheelRadiusCharacterization(drive));
+        chooser.addCmd("TUNING | Drive Slip Current Measurement", () -> slipCurrentMeasurement(drive));
 
         // These only apply to when we're doing "real" tuning
         if(Constants.tuningMode) {
-            chooser.addOption("TUNING | Drive Simple FF Characterization", feedforwardCharacterization(drive));
+            chooser.addCmd("TUNING | Drive Simple FF Characterization", () -> feedforwardCharacterization(drive));
 
-            chooser.addOption("TUNING | Drive SysId (Quasistatic Forward)",
-                sysIdQuasistatic(drive, SysIdRoutine.Direction.kForward));
-            chooser.addOption("TUNING | Drive SysId (Quasistatic Reverse)",
-                sysIdQuasistatic(drive, SysIdRoutine.Direction.kReverse));
-            chooser.addOption("TUNING | Drive SysId (Dynamic Forward)",
-                sysIdDynamic(drive, SysIdRoutine.Direction.kForward));
-            chooser.addOption("TUNING | Drive SysId (Dynamic Reverse)",
-                sysIdDynamic(drive, SysIdRoutine.Direction.kReverse));
+            chooser.addCmd("TUNING | Drive SysId (Quasistatic Forward)",
+                () -> sysIdQuasistatic(drive, SysIdRoutine.Direction.kForward));
+            chooser.addCmd("TUNING | Drive SysId (Quasistatic Reverse)",
+                () -> sysIdQuasistatic(drive, SysIdRoutine.Direction.kReverse));
+            chooser.addCmd("TUNING | Drive SysId (Dynamic Forward)",
+                () -> sysIdDynamic(drive, SysIdRoutine.Direction.kForward));
+            chooser.addCmd("TUNING | Drive SysId (Dynamic Reverse)",
+                () -> sysIdDynamic(drive, SysIdRoutine.Direction.kReverse));
 
-            chooser.addOption("TUNING | Drive Angular SysId (Quasistatic Forward)",
-                sysIdQuasistaticAngular(drive, SysIdRoutine.Direction.kForward));
-            chooser.addOption("TUNING | Drive Angular SysId (Quasistatic Reverse)",
-                sysIdQuasistaticAngular(drive, SysIdRoutine.Direction.kReverse));
-            chooser.addOption("TUNING | Drive Angular SysId (Dynamic Forward)",
-                sysIdDynamicAngular(drive, SysIdRoutine.Direction.kForward));
-            chooser.addOption("TUNING | Drive Angular SysId (Dynamic Reverse)",
-                sysIdDynamicAngular(drive, SysIdRoutine.Direction.kReverse));
+            chooser.addCmd("TUNING | Drive Angular SysId (Quasistatic Forward)",
+                () -> sysIdQuasistaticAngular(drive, SysIdRoutine.Direction.kForward));
+            chooser.addCmd("TUNING | Drive Angular SysId (Quasistatic Reverse)",
+                () -> sysIdQuasistaticAngular(drive, SysIdRoutine.Direction.kReverse));
+            chooser.addCmd("TUNING | Drive Angular SysId (Dynamic Forward)",
+                () -> sysIdDynamicAngular(drive, SysIdRoutine.Direction.kForward));
+            chooser.addCmd("TUNING | Drive Angular SysId (Dynamic Reverse)",
+                () -> sysIdDynamicAngular(drive, SysIdRoutine.Direction.kReverse));
         }
     }
 
