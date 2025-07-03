@@ -8,6 +8,7 @@ Features:
 * Ability to have a 3rd controller to control leds
 * Uneven bumpers
 * Very shakey
+* Held together by rachet straps
 * Ability to rip up carpet (happend during the mentor match)
 * Fire hazard :fire:
 * Can absolutely carry on L1s
