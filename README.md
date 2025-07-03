@@ -1,6 +1,6 @@
 # Timothy2025
 > Timothy was our off-season bot we used at the 24 Hour Lakeshore Robotics Endurance Competition. He finished as the 4th seed, 3rd alliance captain and was a finalist.
-Features:
+### Features:
 * PID based auto align
 * Intergrates with our [2025DriverStationInterface](https://github.com/wave-2826/2025DriverStationInterface)
 * Single or dual driver modes
